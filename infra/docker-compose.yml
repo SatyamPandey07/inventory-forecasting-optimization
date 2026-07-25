@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: inventoryai-postgres
+    environment:
+      POSTGRES_DB: inventoryai
+      POSTGRES_USER: inventory_user
+      POSTGRES_PASSWORD: inventory_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./db-migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory_user -d inventoryai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    container_name: inventoryai-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: inventoryai-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - postgres
+
+  python-forecasting:
+    build:
+      context: ../forecasting-engine
+      dockerfile: Dockerfile
+    container_name: inventoryai-forecasting
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://inventory_user:inventory_password@postgres:5432/inventoryai
+      REDIS_URL: redis://redis:6379/0
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  node-api:
+    build:
+      context: ../backend-api
+      dockerfile: Dockerfile
+    container_name: inventoryai-node-api
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://inventory_user:inventory_password@postgres:5432/inventoryai
+      FASTAPI_ENGINE_URL: http://python-forecasting:8000
+      JWT_SECRET: super_secret_inventoryai_jwt_key_2026
+    depends_on:
+      postgres:
+        condition: service_healthy
+      python-forecasting:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: inventoryai-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    depends_on:
+      - node-api
+
+volumes:
+  timescale_data:
