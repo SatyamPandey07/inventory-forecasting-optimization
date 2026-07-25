@@ -6,9 +6,21 @@
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
 [![Version](https://img.shields.io/badge/Version-v1.0.0-indigo.svg)](https://github.com/SatyamPandey07/inventory-forecasting-optimization/releases/tag/v1.0.0)
 
-Live URL- https://fascinating-narwhal-5f1ac9.netlify.app/
+## About InventoryAI
+<div align="right">
+  <strong>Live Demo:</strong> <a href="https://fascinating-narwhal-5f1ac9.netlify.app/">https://fascinating-narwhal-5f1ac9.netlify.app/</a>
+</div>
 
-InventoryAI is a full-stack, enterprise-ready supply chain SaaS platform engineered to eliminate stockouts and optimize inventory holding costs. Built with a Next.js 14 frontend, Node.js Express gateway, Python FastAPI machine learning engine, PostgreSQL + TimescaleDB database, and Redis caching stack, it delivers end-to-end demand intelligence. The platform combines Facebook Prophet forecasting, SciPy economic order quantity (EOQ) optimization, Anthropic Claude generative AI executive reasoning, and 1,000-trial Monte Carlo risk simulations into a production-ready cloud application.
+InventoryAI is a SaaS platform designed to eliminate stockouts and minimize excess inventory costs. 
+It combines demand forecasting, generative AI-driven reasoning, and multi-objective optimization into a single dashboard. 
+By integrating predictive machine learning with real-time analytics, organizations can automate their entire inventory planning workflow.
+
+### Product Requirements Document (PRD)
+The Product Requirements Document (PRD) defines the core architecture, functional capabilities, and user workflows for InventoryAI. 
+It provides detailed specifications on the predictive time-series demand engine and multi-objective inventory optimization.
+Please review the complete PRD to understand the end-to-end supply chain integration and generative AI decision logic.
+
+[View the PRD Document (PDF)](docs/PRD.pdf)
 
 ---
 
@@ -21,10 +33,22 @@ Managing retail inventory requires balancing two conflicting financial pressures
 **InventoryAI** automates end-to-end inventory management through five core capabilities:
 
 1. **Predictive Time-Series Demand Engine**: Utilizes Facebook Prophet to analyze historical demand patterns, annual and weekly seasonality, holiday spikes, and external weather signals to generate 90-day forward demand predictions with 95% confidence bounds.
-2. **Multi-Objective Inventory Optimization**: Calculates optimal Economic Order Quantities ($Q^*$), dynamic Safety Stock levels, and Reorder Points (ROP) using numerical minimization (`scipy.optimize`), balancing carrying costs against stockout penalties while enforcing supplier minimum order quantities (`min_order_qty`) and lead time constraints.
-3. **Generative AI Executive Reasoning Layer**: Integrates Anthropic Claude (`claude-3-5-sonnet`) to synthesize multi-signal inputs (forecast trends, OpenWeatherMap weather patterns, public holiday calendars, competitor stockouts) into actionable, plain-language executive prose recommendations.
-4. **What-If Monte Carlo Scenario Simulator**: Performs discrete-event simulations across 1,000 trial runs over a 90-day horizon, calculating risk percentiles ($p_{10}, p_{50}, p_{90}, p_{95}$) and outcome cost distributions under supply chain disruptions, lead time delays, and demand shocks.
-5. **Operational Observability & Analytics**: Exposes Prometheus metrics across microservices, provisions 5 operational Grafana dashboards, tracks forecast accuracy trends (MAPE / MAE), and logs user recommendation acceptance outcomes for verifiable financial ROI auditing.
+2. **Multi-Objective Inventory Optimization**: Calculates optimal Economic Order Quantities (EOQ), dynamic Safety Stock levels, and Reorder Points (ROP) using numerical minimization (`scipy.optimize`), balancing carrying costs against stockout penalties while enforcing supplier minimum order quantities and lead time constraints.
+3. **Generative AI Executive Reasoning Layer**: Integrates Anthropic Claude to synthesize multi-signal inputs (forecast trends, weather patterns, public holiday calendars, competitor stockouts) into actionable, plain-language executive prose recommendations.
+4. **What-If Monte Carlo Scenario Simulator**: Performs discrete-event simulations across 1,000 trial runs over a 90-day horizon, calculating risk percentiles and outcome cost distributions under supply chain disruptions, lead time delays, and demand shocks.
+5. **Operational Observability & Analytics**: Exposes Prometheus metrics across microservices, provisions operational Grafana dashboards, tracks forecast accuracy trends (MAPE / MAE), and logs user recommendation acceptance outcomes for verifiable financial ROI auditing.
+
+---
+
+## Architecture Diagram
+
+![Architecture Diagram](file:///Users/satyampandey/.gemini/antigravity-ide/brain/f7745fec-4fbb-4bf7-9dcb-3a829c51869f/architecture_diagram_1784988851076.png)
+
+---
+
+## Entity Relationship Diagram
+
+![ER Diagram](file:///Users/satyampandey/.gemini/antigravity-ide/brain/f7745fec-4fbb-4bf7-9dcb-3a829c51869f/er_diagram_1784988864708.png)
 
 ---
 
@@ -41,14 +65,14 @@ InventoryAI includes an enterprise authentication and access management layer bu
 ## Interface & Product Visual Tour
 
 ### 1. Executive Control Tower Dashboard (`/`)
-Real-time monitoring dashboard displaying active monitered SKUs, 30-day aggregate sales volume, revenue metrics, stockout risk alerts, top monitored stock levels, 5-minute auto-polling status, and CSV data export.
+Real-time monitoring dashboard displaying active monitored SKUs, 30-day aggregate sales volume, revenue metrics, stockout risk alerts, top monitored stock levels, 5-minute auto-polling status, and CSV data export.
 
 ![Executive Control Tower Overview](docs/images/overview_dashboard.png)
 
 ---
 
 ### 2. AI Inventory Recommendations & Claude Reasoning (`/recommendations`)
-Autonomous reorder recommendation cards displaying calculated order quantities, safety buffers, expected cost savings ($1,850 saved by avoiding stockouts), order value impact, Anthropic Claude prose executive reasoning, and Accept/Reject decision controls.
+Autonomous reorder recommendation cards displaying calculated order quantities, safety buffers, expected cost savings, order value impact, Anthropic Claude prose executive reasoning, and Accept/Reject decision controls.
 
 ![AI Reorder Recommendations](docs/images/ai_recommendations.png)
 
@@ -62,7 +86,7 @@ Interactive simulation interface featuring sliders for supplier lead time delays
 ---
 
 ### 4. Forecast Analytics & Decision Audit (`/analytics`)
-Comprehensive accuracy tracking displaying Prophet model Mean Absolute Percentage Error (MAPE) trends over time (4.5% error rate), Mean Absolute Error (MAE), aggregate net financial cost savings impact (+$5,450.00 saved), and decision history audit logs.
+Comprehensive accuracy tracking displaying Prophet model Mean Absolute Percentage Error (MAPE) trends over time (4.5% error rate), Mean Absolute Error (MAE), aggregate net financial cost savings impact, and decision history audit logs.
 
 ![Forecast Analytics & Decision Audit](docs/images/forecast_analytics.png)
 
@@ -72,15 +96,15 @@ Comprehensive accuracy tracking displaying Prophet model Mean Absolute Percentag
 
 This monorepo was developed iteratively following Conventional Commits across 9 feature branches:
 
-1. [PR #1 — Monorepo Scaffolding & Initial Schema Models](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/monorepo-setup)
-2. [PR #2 — Core Prophet Demand Forecasting Engine & 90-Day Predictions](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/prophet-forecasting)
-3. [PR #3 — External Signals Integration (Weather, Calendar Events, Competitor Tracking)](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/external-signals)
-4. [PR #4 — Anthropic Claude LLM Executive Reasoning Layer](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/llm-reasoning)
-5. [PR #5 — Multi-Objective Inventory Optimization Engine (SciPy EOQ)](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/inventory-optimization)
-6. [PR #6 — Monte Carlo Supply Disruption Scenario Simulator](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/scenario-planning)
-7. [PR #7 — Next.js 14 Executive Control Tower & React Dashboard UI](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/frontend-dashboards)
-8. [PR #8 — Grafana Operational Dashboards & Prometheus Monitoring](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/grafana-dashboards)
-9. [PR #9 — Continuous Learning, Production Hardening & v1.0.0 Tag](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/continuous-learning)
+1. [PR #1 - Monorepo Scaffolding & Initial Schema Models](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/monorepo-setup)
+2. [PR #2 - Core Prophet Demand Forecasting Engine & 90-Day Predictions](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/prophet-forecasting)
+3. [PR #3 - External Signals Integration (Weather, Calendar Events, Competitor Tracking)](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/external-signals)
+4. [PR #4 - Anthropic Claude LLM Executive Reasoning Layer](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/llm-reasoning)
+5. [PR #5 - Multi-Objective Inventory Optimization Engine (SciPy EOQ)](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/inventory-optimization)
+6. [PR #6 - Monte Carlo Supply Disruption Scenario Simulator](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/scenario-planning)
+7. [PR #7 - Next.js 14 Executive Control Tower & React Dashboard UI](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/frontend-dashboards)
+8. [PR #8 - Grafana Operational Dashboards & Prometheus Monitoring](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/grafana-dashboards)
+9. [PR #9 - Continuous Learning, Production Hardening & v1.0.0 Tag](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/continuous-learning)
 
 ---
 
@@ -136,13 +160,13 @@ docker compose -f infra/docker-compose.yml ps
 
 ## Technical Documentation
 
-- 🏛️ [System Architecture & Multi-Tenant Specs](docs/ARCHITECTURE.md)
-- 🎯 [Product Guide & Functional Capabilities](docs/PRODUCT.md)
-- 🔧 [Operations & Maintenance Runbook](docs/OPERATIONS.md)
-- 🗺️ [Product Roadmap & Future Expansion](docs/ROADMAP.md)
+- [System Architecture & Multi-Tenant Specs](docs/ARCHITECTURE.md)
+- [Product Guide & Functional Capabilities](docs/PRODUCT.md)
+- [Operations & Maintenance Runbook](docs/OPERATIONS.md)
+- [Product Roadmap & Future Expansion](docs/ROADMAP.md)
 
 ---
 
-## 📄 License
+## License
 
 Distributed under the MIT License. See `LICENSE` for more information.
