@@ -5,12 +5,10 @@ import {
   Sparkles, 
   CheckCircle2, 
   XCircle, 
-  AlertCircle, 
-  ArrowRight,
-  ShieldCheck,
-  TrendingUp,
+  Download,
   DollarSign
 } from 'lucide-react';
+import { exportToCSV } from '../../lib/csvExport';
 
 export default function RecommendationsPage() {
   const [recommendations, setRecommendations] = useState([
@@ -23,12 +21,13 @@ export default function RecommendationsPage() {
       reorder_point: 48,
       safety_stock: 25,
       recommended_qty: 140,
+      expected_cost_savings: 1850.00,
       lead_time_days: 5,
       supplier_name: 'TechCorp Asia Supply',
       cost_impact: 4550.00,
       confidence: 0.94,
       status: 'pending',
-      reason: '[URGENT REORDER] Current stock (38 units) has fallen below the reorder threshold (48 units). Placing a batch order of 140 units with TechCorp Asia Supply (5-day lead time) secures a 95% target service level and prevents a projected stockout during upcoming holiday demand.'
+      reason: '[URGENT REORDER] Current stock (38 units) has fallen below the reorder threshold (48 units). Placing a batch order of 140 units with TechCorp Asia Supply (5-day lead time) secures a 95% target service level and prevents $1,850 in estimated stockout penalty costs.'
     },
     {
       id: 'rec-2',
@@ -39,12 +38,13 @@ export default function RecommendationsPage() {
       reorder_point: 25,
       safety_stock: 12,
       recommended_qty: 50,
+      expected_cost_savings: 2400.00,
       lead_time_days: 10,
       supplier_name: 'TechCorp Asia Supply',
       cost_impact: 5750.00,
       confidence: 0.91,
       status: 'pending',
-      reason: '[SUPPLIER BUFFER] TechCorp lead time has extended from 5 to 10 days. Reordering 50 units increases safety buffer to absorb lead time volatility and protect revenue.'
+      reason: '[SUPPLIER BUFFER] TechCorp lead time has extended from 5 to 10 days. Reordering 50 units increases safety buffer to absorb lead time volatility and protects $2,400 in revenue.'
     },
     {
       id: 'rec-3',
@@ -55,6 +55,7 @@ export default function RecommendationsPage() {
       reorder_point: 85,
       safety_stock: 40,
       recommended_qty: 220,
+      expected_cost_savings: 1200.00,
       lead_time_days: 7,
       supplier_name: 'EuroTextiles Distribution',
       cost_impact: 3740.00,
@@ -70,6 +71,21 @@ export default function RecommendationsPage() {
     );
   };
 
+  const handleExportCSV = () => {
+    const csvData = recommendations.map(r => ({
+      SKU: r.sku_code,
+      Name: r.sku_name,
+      Category: r.category,
+      Current_Stock: r.current_stock,
+      Recommended_Qty: r.recommended_qty,
+      Expected_Savings: r.expected_cost_savings,
+      Cost_Impact: r.cost_impact,
+      Status: r.status,
+      Reasoning: r.reason
+    }));
+    exportToCSV("ai_reorder_recommendations", csvData);
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -79,8 +95,16 @@ export default function RecommendationsPage() {
             <Sparkles className="w-7 h-7 text-indigo-400" />
             <span>AI Inventory Recommendations</span>
           </h1>
-          <p className="text-slate-400 mt-1">Autonomous EOQ & Safety Stock recommendations with LLM reasoning</p>
+          <p className="text-slate-400 mt-1">Autonomous EOQ & Safety Stock recommendations with Claude LLM reasoning</p>
         </div>
+
+        <button
+          onClick={handleExportCSV}
+          className="px-4 py-2.5 rounded-xl bg-[#1F2937] hover:bg-[#374151] font-medium text-sm text-slate-200 flex items-center space-x-2 transition-colors"
+        >
+          <Download className="w-4 h-4 text-cyan-400" />
+          <span>Export CSV</span>
+        </button>
       </div>
 
       {/* Recommendations Cards List */}
@@ -126,7 +150,7 @@ export default function RecommendationsPage() {
                       className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs flex items-center space-x-1.5 shadow-lg shadow-emerald-600/20 transition-all"
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Approve Reorder</span>
+                      <span>Accept & Log Decision</span>
                     </button>
                   </>
                 ) : (
@@ -140,7 +164,7 @@ export default function RecommendationsPage() {
               </div>
             </div>
 
-            {/* Metrics Metrics Grid */}
+            {/* Metrics Grid */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 py-4">
               <div>
                 <span className="text-xs text-slate-400 font-medium">Current Stock</span>
@@ -155,18 +179,18 @@ export default function RecommendationsPage() {
               </div>
 
               <div>
-                <span className="text-xs text-slate-400 font-medium">Required Safety Stock</span>
-                <p className="text-lg font-bold text-amber-400">{rec.safety_stock} units</p>
-              </div>
-
-              <div>
                 <span className="text-xs text-slate-400 font-medium">Recommended Order Qty</span>
                 <p className="text-lg font-bold text-indigo-400">{rec.recommended_qty} units</p>
               </div>
 
               <div>
+                <span className="text-xs text-slate-400 font-medium">Expected Cost Savings</span>
+                <p className="text-lg font-bold text-emerald-400">${rec.expected_cost_savings.toLocaleString()}</p>
+              </div>
+
+              <div>
                 <span className="text-xs text-slate-400 font-medium">Order Value Impact</span>
-                <p className="text-lg font-bold text-emerald-400">${rec.cost_impact.toLocaleString()}</p>
+                <p className="text-lg font-bold text-cyan-400">${rec.cost_impact.toLocaleString()}</p>
               </div>
             </div>
 
@@ -174,7 +198,7 @@ export default function RecommendationsPage() {
             <div className="bg-[#151D2A] p-4 rounded-xl border border-indigo-500/20 flex items-start space-x-3 mt-2">
               <Sparkles className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
               <div>
-                <h4 className="text-xs font-bold text-indigo-300 uppercase tracking-wider">AI Director Reasoning</h4>
+                <h4 className="text-xs font-bold text-indigo-300 uppercase tracking-wider">Claude Executive Reasoning</h4>
                 <p className="text-xs text-slate-300 mt-1 leading-relaxed">{rec.reason}</p>
               </div>
             </div>
