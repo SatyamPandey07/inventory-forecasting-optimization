@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from './supabaseClient';
 
 export interface UserProfile {
@@ -31,9 +32,20 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
 });
 
+// Helper: set the auth cookie (readable by middleware)
+function setAuthCookie() {
+  document.cookie = 'inventoryai_auth=true; path=/; max-age=604800; SameSite=Lax';
+}
+
+// Helper: clear the auth cookie
+function clearAuthCookie() {
+  document.cookie = 'inventoryai_auth=; path=/; max-age=0; SameSite=Lax';
+}
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true); // true until localStorage is read
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     // Restore session from localStorage on mount
@@ -41,30 +53,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const savedUser = localStorage.getItem('inventoryai_user');
       if (savedUser) {
         setUser(JSON.parse(savedUser));
+        setAuthCookie(); // ensure cookie is in sync
+      } else {
+        clearAuthCookie(); // no session — clear cookie in case it's stale
       }
     } catch (e) {
       console.error('Failed to parse saved user session:', e);
+      clearAuthCookie();
     } finally {
       setLoading(false);
     }
   }, []);
 
+  const persistUser = (u: UserProfile) => {
+    setUser(u);
+    localStorage.setItem('inventoryai_user', JSON.stringify(u));
+    setAuthCookie();
+  };
+
   const login = async (email: string, pass: string) => {
     setLoading(true);
     try {
       if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+        const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
         if (error) throw error;
       }
-      const newUser: UserProfile = {
+      persistUser({
         id: `usr-${Date.now()}`,
-        email: email,
+        email,
         name: 'Satyam Pandey',
         org_name: 'Acme Retail Corp',
-        role: 'Operations Director'
-      };
-      setUser(newUser);
-      localStorage.setItem('inventoryai_user', JSON.stringify(newUser));
+        role: 'Operations Director',
+      });
     } finally {
       setLoading(false);
     }
@@ -77,19 +97,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const { error } = await supabase.auth.signUp({
           email,
           password: pass,
-          options: { data: { name, org_name: orgName } }
+          options: { data: { name, org_name: orgName } },
         });
         if (error) throw error;
       }
-      const newUser: UserProfile = {
+      persistUser({
         id: `usr-${Date.now()}`,
-        email: email,
-        name: name || email.split('@')[0],
+        email,
+        name: name || 'Satyam Pandey',
         org_name: orgName || 'New Retail Org',
-        role: 'Tenant Admin'
-      };
-      setUser(newUser);
-      localStorage.setItem('inventoryai_user', JSON.stringify(newUser));
+        role: 'Tenant Admin',
+      });
     } finally {
       setLoading(false);
     }
@@ -101,15 +119,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && provider !== 'saml') {
         await supabase.auth.signInWithOAuth({ provider });
       } else {
-        const ssoUser: UserProfile = {
+        persistUser({
           id: `sso-${provider}-${Date.now()}`,
-          email: `enterprise-user@acmeretail.com`,
-          name: `Enterprise User (${provider.toUpperCase()})`,
+          email: `satyam@acmeretail.com`,
+          name: 'Satyam Pandey',
           org_name: 'Acme Global Supply Chain',
-          role: 'Enterprise SSO User'
-        };
-        setUser(ssoUser);
-        localStorage.setItem('inventoryai_user', JSON.stringify(ssoUser));
+          role: 'Enterprise SSO User',
+        });
       }
     } finally {
       setLoading(false);
@@ -117,15 +133,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const demoLogin = () => {
-    const demoUser: UserProfile = {
+    persistUser({
       id: 'usr-demo-001',
       email: 'satyam@acmeretail.com',
       name: 'Satyam Pandey',
       org_name: 'Acme Retail Corp',
-      role: 'Supply Chain Director'
-    };
-    setUser(demoUser);
-    localStorage.setItem('inventoryai_user', JSON.stringify(demoUser));
+      role: 'Supply Chain Director',
+    });
   };
 
   const logout = () => {
@@ -134,6 +148,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     setUser(null);
     localStorage.removeItem('inventoryai_user');
+    clearAuthCookie();
+    // Hard redirect — forces middleware to re-evaluate, clearing any cached page state
+    window.location.href = '/login';
   };
 
   return (

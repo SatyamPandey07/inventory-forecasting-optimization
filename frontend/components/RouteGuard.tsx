@@ -14,12 +14,13 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (loading) return;
     const isPublic = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
+    // Belt-and-suspenders: client-side guard in addition to middleware
     if (!user && !isPublic) {
-      router.replace('/login');
+      window.location.href = '/login';
     }
-  }, [user, loading, pathname, router]);
+  }, [user, loading, pathname]);
 
-  // While loading session from storage, show nothing to avoid flash
+  // Show spinner while restoring session from localStorage
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#0A0F1D]">
@@ -30,10 +31,8 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
 
   const isPublic = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
 
-  // If not logged in and not on a public route, render nothing (redirect fires above)
-  if (!user && !isPublic) {
-    return null;
-  }
+  // If not logged in and on a protected route, render nothing while redirect fires
+  if (!user && !isPublic) return null;
 
   return <>{children}</>;
 }

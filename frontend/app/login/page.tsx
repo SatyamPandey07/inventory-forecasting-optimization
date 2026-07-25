@@ -15,17 +15,17 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     await login(email, password);
-    router.push('/');
+    window.location.href = '/';
   };
 
   const handleSSO = async (provider: 'google' | 'github' | 'saml') => {
     await loginWithSSO(provider);
-    router.push('/');
+    window.location.href = '/';
   };
 
   const handleQuickDemo = () => {
     demoLogin();
-    router.push('/');
+    window.location.href = '/';
   };
 
   return (
