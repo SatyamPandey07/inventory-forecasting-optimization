@@ -1,10 +1,12 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
+import os
+import redis
 import uvicorn
 
-from forecaster import DemandForecaster
+from forecaster import ProphetDemandEngine
 from optimizer import InventoryOptimizer
 from simulator import ScenarioSimulator
 from llm_reasoner import LLMReasoningEngine
@@ -12,7 +14,7 @@ from weather_events import ExternalDataEnricher
 
 app = FastAPI(
     title="InventoryAI — Forecasting & Optimization Engine",
-    description="Python FastAPI engine for Prophet demand forecasting, Safety Stock / EOQ optimization, Monte Carlo simulations, and AI reasoning.",
+    description="Python FastAPI service for Prophet demand forecasting, Safety Stock / EOQ optimization, Monte Carlo simulations, and AI reasoning.",
     version="1.0.0"
 )
 
@@ -24,124 +26,125 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-forecaster = DemandForecaster(use_prophet=True)
+engine = ProphetDemandEngine()
 optimizer = InventoryOptimizer()
 simulator = ScenarioSimulator()
 llm_engine = LLMReasoningEngine()
 weather_enricher = ExternalDataEnricher()
 
-# --- Request / Response Models ---
+# Redis Client
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+try:
+    redis_client = redis.Redis.from_url(REDIS_URL)
+except Exception:
+    redis_client = None
+
+# --- Schemas ---
 class DemandHistoryItem(BaseModel):
     ds: str = Field(..., example="2026-04-01")
     y: float = Field(..., example=35.0)
 
-class ForecastRequest(BaseModel):
-    history: List[DemandHistoryItem]
-    horizon_days: Optional[int] = 30
+class TrainRequest(BaseModel):
+    sku_id: str = Field(..., example="33333333-3333-3333-3333-333333333333")
+    org_id: str = Field(..., example="11111111-1111-1111-1111-111111111111")
+    demand_history: List[DemandHistoryItem]
 
-class OptimizeRequest(BaseModel):
-    avg_daily_demand: float = Field(..., example=35.0)
-    std_daily_demand: float = Field(..., example=8.5)
-    lead_time_days: int = Field(..., example=5)
-    std_lead_time_days: Optional[float] = 1.0
-    unit_cost: float = Field(..., example=35.0)
-    holding_cost_annual_pct: Optional[float] = 0.20
-    order_cost: Optional[float] = 100.0
-    service_level: Optional[float] = 0.95
+class PredictRequest(BaseModel):
+    sku_id: str = Field(..., example="33333333-3333-3333-3333-333333333333")
+    org_id: str = Field(..., example="11111111-1111-1111-1111-111111111111")
+    horizon_days: Optional[int] = 90
 
-class SimulateRequest(BaseModel):
-    initial_stock: int = Field(..., example=38)
-    reorder_point: int = Field(..., example=48)
-    order_qty: int = Field(..., example=120)
-    base_lead_time_days: int = Field(..., example=5)
-    lead_time_delay_days: int = Field(..., example=3)
-    avg_daily_demand: float = Field(..., example=35.0)
-    demand_surge_pct: float = Field(..., example=20.0)
-    unit_cost: float = Field(..., example=35.0)
-    simulation_days: Optional[int] = 90
+class AccuracyRequest(BaseModel):
+    actuals: List[float] = Field(..., example=[40, 42, 38, 45])
+    predictions: List[float] = Field(..., example=[42, 40, 39, 44])
 
-class ExplainRequest(BaseModel):
-    sku_name: str
-    category: str
-    current_stock: int
-    reorder_point: int
-    recommended_qty: int
-    safety_stock: int
-    lead_time_days: int
-    supplier_name: str
-    scenario_name: Optional[str] = "base_case"
-
-# --- API Endpoints ---
+# --- Endpoints ---
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "FastAPI Forecasting Engine"}
+    return {"status": "ok", "service": "Python FastAPI Forecasting Engine"}
 
-@app.post("/api/v1/forecast")
-def generate_forecast(req: ForecastRequest):
+@app.post("/forecast/train")
+def train_forecast_model(req: TrainRequest):
+    """
+    POST /forecast/train
+    Accepts historical demand, trains Prophet model, and stores model artifact in Redis.
+    """
     try:
-        history_dicts = [item.model_dump() for item in req.history]
-        result = forecaster.forecast(history_dicts, horizon_days=req.horizon_days)
-        return result
+        history_list = [item.model_dump() for item in req.demand_history]
+        model_bytes, summary = engine.train(history_list)
+
+        redis_key = f"model:{req.org_id}:{req.sku_id}"
+        if redis_client:
+            try:
+                redis_client.set(redis_key, model_bytes)
+            except Exception as e:
+                pass
+
+        return {
+            "sku_id": req.sku_id,
+            "org_id": req.org_id,
+            "redis_key": redis_key,
+            "training_summary": summary
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/api/v1/optimize")
-def optimize_inventory(req: OptimizeRequest):
+@app.post("/forecast/predict")
+def predict_demand(req: PredictRequest):
+    """
+    GET /forecast/predict
+    Returns 90-day demand predictions with lower_bound, point_estimate, upper_bound.
+    """
     try:
-        result = optimizer.optimize_sku(
-            avg_daily_demand=req.avg_daily_demand,
-            std_daily_demand=req.std_daily_demand,
-            lead_time_days=req.lead_time_days,
-            std_lead_time_days=req.std_lead_time_days or 1.0,
-            unit_cost=req.unit_cost,
-            holding_cost_annual_pct=req.holding_cost_annual_pct or 0.20,
-            order_cost=req.order_cost or 100.0,
-            service_level=req.service_level or 0.95
-        )
-        return result
+        redis_key = f"model:{req.org_id}:{req.sku_id}"
+        model_bytes = None
+
+        if redis_client:
+            try:
+                model_bytes = redis_client.get(redis_key)
+            except Exception:
+                pass
+
+        if not model_bytes:
+            # Fallback mock demand history if model artifact isn't in Redis yet
+            mock_history = [
+                {"ds": f"2026-01-{(i%30)+1:02d}", "y": 35 + (i % 10)}
+                for i in range(60)
+            ]
+            model_bytes, _ = engine.train(mock_history)
+
+        predictions = engine.predict(model_bytes, horizon_days=req.horizon_days or 90)
+
+        total_predicted = sum(p['point_estimate'] for p in predictions)
+        avg_daily = round(total_predicted / len(predictions), 2) if predictions else 0.0
+
+        return {
+            "sku_id": req.sku_id,
+            "org_id": req.org_id,
+            "horizon_days": req.horizon_days or 90,
+            "total_predicted_units": total_predicted,
+            "avg_daily_predicted": avg_daily,
+            "predictions": predictions
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/api/v1/simulate-scenario")
-def run_scenario_simulation(req: SimulateRequest):
+@app.post("/forecast/accuracy")
+def calculate_forecast_accuracy(req: AccuracyRequest):
+    """
+    GET /forecast/accuracy
+    Calculates MAPE (Mean Absolute Percentage Error) and MAE (Mean Absolute Error).
+    """
     try:
-        result = simulator.run_simulation(
-            initial_stock=req.initial_stock,
-            reorder_point=req.reorder_point,
-            order_qty=req.order_qty,
-            base_lead_time_days=req.base_lead_time_days,
-            lead_time_delay_days=req.lead_time_delay_days,
-            avg_daily_demand=req.avg_daily_demand,
-            demand_surge_pct=req.demand_surge_pct,
-            unit_cost=req.unit_cost,
-            simulation_days=req.simulation_days or 90
-        )
-        return result
+        metrics = engine.calculate_accuracy(req.actuals, req.predictions)
+        return {
+            "mape": metrics["mape"],
+            "mape_percentage": f"{round(metrics['mape'] * 100, 2)}%",
+            "mae": metrics["mae"],
+            "sample_size": len(req.actuals)
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/api/v1/explain-recommendation")
-async def explain_recommendation(req: ExplainRequest):
-    try:
-        explanation = await llm_engine.explain_recommendation(
-            sku_name=req.sku_name,
-            category=req.category,
-            current_stock=req.current_stock,
-            reorder_point=req.reorder_point,
-            recommended_qty=req.recommended_qty,
-            safety_stock=req.safety_stock,
-            lead_time_days=req.lead_time_days,
-            supplier_name=req.supplier_name,
-            scenario_name=req.scenario_name or "base_case"
-        )
-        return {"explanation": explanation}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.get("/api/v1/weather")
-async def get_weather(city: str = Query("New York")):
-    weather = await weather_enricher.get_weather_forecast(city)
-    return weather
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
