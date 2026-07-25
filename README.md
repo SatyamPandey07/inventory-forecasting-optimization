@@ -8,8 +8,7 @@
 
 ## About InventoryAI
 <div align="left">
-  <strong>Live Demo:</strong>
-  <a href="https://fascinating-narwhal-5f1ac9.netlify.app/">https://fascinating-narwhal-5f1ac9.netlify.app/</a>
+  <strong>Live Demo:</strong><a href="https://fascinating-narwhal-5f1ac9.netlify.app/">https://fascinating-narwhal-5f1ac9.netlify.app/</a>
 </div>
 
 <br>
