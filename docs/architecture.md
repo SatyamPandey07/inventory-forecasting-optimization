@@ -1,65 +1,62 @@
-# Architecture & System Design — InventoryAI
+# InventoryAI — System Architecture & Technical Specifications
 
-**InventoryAI** (DemandFlow) is an open-source supply chain intelligence and inventory optimization platform designed to predict demand, recommend optimal stocking levels, monitor supplier performance, and simulate supply chain cost risks.
+**InventoryAI** (DemandFlow) is an open-source, full-stack supply chain demand forecasting and inventory optimization SaaS platform.
 
 ---
 
-## High-Level System Architecture
+## 🏛️ Microservice Architecture Overview
 
-```
-[ Retailer / Manufacturer User ]
-                │
-                ▼
-   [ Next.js + React Dashboard ] (Port 3000)
-                │
-       ┌────────┴──────────────────────────┐
-       ▼                                   ▼
-[ Node.js Express Gateway ]      [ Grafana Dashboards ] (Port 3001)
- (Port 4000: Auth, Multi-tenant)
-       │
-       ▼
-[ PostgreSQL + TimescaleDB ] ◄────┐
- (Port 5432: Hypertables)          │
-       ▲                           │
-       │                           ▼
-       │               [ Python FastAPI Engine ] (Port 8000)
-       │               ├── Prophet Time-Series Forecaster
-       │               ├── EOQ / Safety Stock Math
-       │               ├── Monte Carlo Scenario Simulator
-       │               └── Claude LLM / Rule Reasoning
-       │                           │
-       └───────────────────────────┼───────────────────────────┐
-                                   ▼                           ▼
-                             [ Redis Cache ] ◄──► [ Celery Background Worker ]
-                              (Port 6379)
+```text
+                               ┌──────────────────────────┐
+                               │  Next.js 14 Dashboard UI │
+                               │  (Port 3000)             │
+                               └────────────┬─────────────┘
+                                            │ HTTP / JSON
+                               ┌────────────▼─────────────┐
+                               │  Node.js Express Gateway │
+                               │  (Port 4000)             │
+                               └────────────┬─────────────┘
+                                            │ HTTP API / REST
+                    ┌───────────────────────┴───────────────────────┐
+                    │                                               │
+       ┌────────────▼─────────────┐                   ┌─────────────▼────────────┐
+       │ Python FastAPI Engine    │                   │ PostgreSQL 15 +          │
+       │ (Port 8000)              │                   │ TimescaleDB Hypertables  │
+       │ Prophet | SciPy | Claude │                   │ (Port 5432)              │
+       └────────────┬─────────────┘                   └──────────────────────────┘
+                    │ Celery / Redis
+       ┌────────────▼─────────────┐                   ┌──────────────────────────┐
+       │ Redis 7 Cache & Queue    │                   │ Prometheus & Grafana     │
+       │ (Port 6379)              │                   │ Observability (3001/9090)│
+       └──────────────────────────┘                   └──────────────────────────┘
 ```
 
 ---
 
-## Open-Source Tech Stack
+## 🔧 Core Microservices
 
-| Service Layer | Technology Chosen | Technical Rationale |
-|---|---|---|
-| **Core AI Engine** | Python 3.11 + FastAPI | Native environment for machine learning, Prophet time-series models, and LLM orchestration. |
-| **Business & Gateway API** | Node.js + TypeScript (Express) | High-throughput asynchronous routing, multi-tenant middleware, and user management. |
-| **Forecasting Engine** | Facebook Prophet | Open-source time-series forecasting with automatic holiday, trend, and weekly seasonality support. |
-| **Time-Series Database** | PostgreSQL 15 + TimescaleDB | Open-source hypertable engine optimized for high-volume daily sales and stock level data. |
-| **Job Queue & Cache** | Redis + Celery | Scheduled nightly forecasts, weekly model retraining, and real-time query caching. |
-| **Dashboard UI** | Next.js 14 + React + Tailwind CSS | Modern server-rendered web application with interactive Recharts visualizations. |
-| **Observability** | Prometheus + Grafana | Standardized open-source system performance and alert monitoring stack. |
+### 1. Node.js Express Gateway (`backend-api`)
+- **Port:** `4000`
+- **Role:** Handles multi-tenant organization routing, user authentication (JWT), SKU catalog management, audit logging, and Prometheus metrics (`prom-client`).
+
+### 2. Python FastAPI Intelligence Engine (`forecasting-engine`)
+- **Port:** `8000`
+- **Role:** Performs Facebook Prophet time-series demand forecasting, SciPy multi-objective cost optimization, Claude LLM reasoning, Monte Carlo scenario simulations, weather/holiday signal integration, and automated Celery model retraining.
+
+### 3. PostgreSQL 15 + TimescaleDB Database (`infra/db-migrations/`)
+- **Port:** `5432`
+- **Role:** Stores hypertable time-series demand history, weather measurements, forecast confidence bands, inventory recommendations, supplier reliability ratings, and audit logs.
+
+### 4. Redis Cache & Job Queue (`redis`)
+- **Port:** `6379`
+- **Role:** Caches serialized Prophet model binaries (`model:{org_id}:{sku_id}`), hashes Claude LLM responses for 1 hour (`llm_cache:{hash}`), and serves as Celery task broker.
+
+### 5. Observability Stack (`prometheus`, `grafana`)
+- **Ports:** Prometheus `9090`, Grafana `3001`
+- **Role:** Scrapes `/metrics` endpoints across microservices, fires AlertManager alerts (MAPE < 70%, stockouts, API latency > 1s), and provisions 5 operational dashboards.
 
 ---
 
-## Data Model & Hypertables
+## 🔒 Multi-Tenant Data Isolation
 
-### Hypertables
-- `demand_history` (`time`, `org_id`, `sku_id`, `units_sold`, `revenue`)
-- `inventory_levels` (`time`, `org_id`, `sku_id`, `units_on_hand`, `units_on_order`)
-- `weather_data` (`time`, `org_id`, `location`, `temp`, `humidity`, `precipitation`)
-
-### Relational Schema
-- `organizations` (`id`, `name`, `tier`, `created_at`)
-- `users` (`id`, `org_id`, `name`, `email`, `role`, `created_at`)
-- `skus` (`id`, `org_id`, `sku_code`, `name`, `category`, `unit_cost`, `unit_price`, `reorder_point`, `safety_stock`, `economic_order_qty`, `lead_time_days`)
-- `suppliers` (`id`, `org_id`, `name`, `contact_email`, `lead_time_days`, `reliability_score`, `quality_score`)
-- `inventory_recommendations` (`id`, `org_id`, `sku_id`, `recommended_qty`, `safety_stock`, `reorder_point`, `reason`, `cost_impact`, `status`)
+Every database table references `org_id UUID NOT NULL REFERENCES organizations(id)`. All API endpoints validate the JWT token payload to ensure users can strictly access data belonging to their active tenant organization.
