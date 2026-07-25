@@ -8,9 +8,11 @@
 
 ## About InventoryAI
 <div align="left">
-  <strong>Live Demo:</strong> <a href="https://fascinating-narwhal-5f1ac9.netlify.app/">https://fascinating-narwhal-5f1ac9.netlify.app/</a>
+  <strong>Live Demo:</strong><br>
+  <a href="https://fascinating-narwhal-5f1ac9.netlify.app/">https://fascinating-narwhal-5f1ac9.netlify.app/</a>
 </div>
 
+<br>
 
 InventoryAI is a SaaS platform designed to eliminate stockouts and minimize excess inventory costs. 
 It combines demand forecasting, generative AI-driven reasoning, and multi-objective optimization into a single dashboard. 
