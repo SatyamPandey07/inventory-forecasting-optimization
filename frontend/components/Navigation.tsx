@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   TrendingUp, 
-  Package, 
   Sparkles, 
   Sliders, 
   Truck, 
   BarChart3,
+  Settings,
+  LineChart,
   Box
 } from 'lucide-react';
 
@@ -22,6 +23,8 @@ export default function Navigation() {
     { href: '/recommendations', label: 'AI Reorders', icon: Sparkles },
     { href: '/simulator', label: 'Scenario Simulator', icon: Sliders },
     { href: '/suppliers', label: 'Suppliers', icon: Truck },
+    { href: '/analytics', label: 'Analytics', icon: LineChart },
+    { href: '/settings', label: 'Settings', icon: Settings },
   ];
 
   return (
@@ -65,7 +68,7 @@ export default function Navigation() {
           <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
           <div className="text-xs">
             <p className="font-semibold text-slate-200">Acme Retail Corp</p>
-            <p className="text-slate-400">Pro Plan • Multi-Tenant</p>
+            <p className="text-slate-400">Pro Plan • Auto-polling 5m</p>
           </div>
         </div>
       </div>
