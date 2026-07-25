@@ -20,19 +20,23 @@ inventory-forecasting-optimization/
 
 ---
 
+## 💻 Next.js React Dashboard UI
+
+InventoryAI features a responsive dashboard built with **Next.js 14**, **React**, **Tailwind CSS**, and **Recharts**:
+
+1. **Executive Control Tower ([`app/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/page.tsx))**: Real-time inventory levels, demand trends, top SKUs table, auto-polling every 5 minutes, and CSV export.
+2. **AI Reorders & Decisions ([`app/recommendations/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/recommendations/page.tsx))**: Pending reorder recommendations, expected cost savings, Claude LLM prose reasoning, Accept/Reject buttons, and CSV export.
+3. **What-If Scenario Simulator ([`app/simulator/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/simulator/page.tsx))**: Sliders for lead time delay and demand variance, executing 1,000 Monte Carlo trials and plotting cost outcome distributions as a histogram bar chart.
+4. **Supplier Performance Scorecard ([`app/suppliers/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/suppliers/page.tsx))**: Supplier lead times, reliability ratings, and quality scores.
+5. **Settings & SKU Manager ([`app/settings/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/settings/page.tsx))**: Organization details, add new SKU form, carrying cost % and stockout penalty constraints.
+6. **Analytics & Precision Tracking ([`app/analytics/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/analytics/page.tsx))**: Forecast precision metrics (MAPE/MAE trends over time) and decision cost savings audit.
+
+---
+
 ## 🎲 Scenario Planning & Cost Simulator
 
-InventoryAI provides a discrete-event Monte Carlo simulator (`POST /scenarios/simulate`) executing 1,000 trial runs over a 90-day horizon to evaluate supply chain disruption risks and total cost distributions.
-
-### Supported Scenario Queries
-- **Weather Scenario:** *"What if it rains next Saturday?"* (`demand_surge_pct: +15.0`)
-- **Competitor Scenario:** *"What if competitor goes out of stock?"* (`demand_surge_pct: +20.0`)
-- **Supplier Scenario:** *"What if our supplier delays 1 week?"* (`lead_time_delay_days: +7`)
-- **Demand Spike Scenario:** *"What if demand spikes 50%?"* (`demand_surge_pct: +50.0`)
-
-### Statistical Output Structure
-- **Percentiles**: 10th (`p10`), 50th (`p50` median), 90th (`p90`), and 95th (`p95` worst-case risk).
-- **Histogram Visualization Payload**: 10 frequency bins (`bin_edges`, `counts`, `bin_centers`) formatted for histogram charts (Recharts / Chart.js).
+- **Percentile Metrics**: 10th (`p10`), 50th (`p50` median), 90th (`p90`), and 95th (`p95` worst-case risk).
+- **Histogram Visualization Payload**: 10 frequency bins (`bin_edges`, `counts`, `bin_centers`) formatted for histogram charts.
 
 ---
 
@@ -85,6 +89,6 @@ docker compose -f infra/docker-compose.yml up --build
 - [x] **PR #4 — Claude LLM Executive Reasoning Layer**
 - [x] **PR #5 — Multi-Objective Inventory Optimization Engine**
 - [x] **PR #6 — Monte Carlo Supply Disruption Scenario Simulator**
-- [ ] **PR #7 — Node.js Express Gateway Multi-Tenant API Routes**
-- [ ] **PR #8 — Next.js Executive Control Tower & Interactive Dashboard**
+- [x] **PR #7 — Next.js Executive Control Tower & Interactive Dashboard**
+- [ ] **PR #8 — Celery Background Jobs & Automated Retraining**
 - [ ] **PR #9 — Grafana Observability & Final System Polish**
