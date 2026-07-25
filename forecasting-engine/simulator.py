@@ -1,23 +1,24 @@
 import numpy as np
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 class ScenarioSimulator:
     """
-    Monte Carlo Discrete Event Simulator for Supply Chain Inventory:
-    Simulates daily stock levels, stockout risks, carrying costs, and total cost impact
-    under various supply disruption and demand shock scenarios.
+    Monte Carlo Discrete Event Simulator for Supply Chain Inventory & Scenario Analysis:
+    Simulates daily inventory stock levels, stockout probabilities, carrying costs, and total cost outcomes
+    under demand shocks, weather shifts, competitor stockouts, and supplier lead time delays across N trials.
     """
 
     def run_simulation(
         self,
-        initial_stock: int,
-        reorder_point: int,
-        order_qty: int,
-        base_lead_time_days: int,
-        lead_time_delay_days: int,
-        avg_daily_demand: float,
-        demand_surge_pct: float,
-        unit_cost: float,
+        scenario_name: str = "Base Case",
+        initial_stock: int = 38,
+        reorder_point: int = 48,
+        order_qty: int = 120,
+        base_lead_time_days: int = 5,
+        lead_time_delay_days: int = 0,
+        avg_daily_demand: float = 35.0,
+        demand_surge_pct: float = 0.0,
+        unit_cost: float = 35.0,
         holding_cost_annual_pct: float = 0.20,
         stockout_penalty_per_unit: float = 30.0,
         simulation_days: int = 90,
@@ -25,9 +26,10 @@ class ScenarioSimulator:
     ) -> Dict[str, Any]:
         """
         Runs Monte Carlo simulation across N trials over M days.
+        Returns outcome distribution, percentiles (p10, p50, p90, p95), and histogram visualization bins.
         """
-        effective_lead_time = base_lead_time_days + lead_time_delay_days
-        effective_demand_mean = avg_daily_demand * (1.0 + (demand_surge_pct / 100.0))
+        effective_lead_time = max(1, base_lead_time_days + lead_time_delay_days)
+        effective_demand_mean = max(1.0, avg_daily_demand * (1.0 + (demand_surge_pct / 100.0)))
         demand_std = max(2.0, effective_demand_mean * 0.25)
         daily_holding_cost_per_unit = (unit_cost * holding_cost_annual_pct) / 365.0
 
@@ -44,7 +46,7 @@ class ScenarioSimulator:
             total_carrying_units = 0
 
             for day in range(1, simulation_days + 1):
-                # Check for arriving orders
+                # Arrive orders
                 arrived_qty = sum(qty for arrival_day, qty in pipeline_orders if arrival_day == day)
                 stock += arrived_qty
                 pipeline_orders = [(arr, qty) for arr, qty in pipeline_orders if arr > day]
@@ -62,11 +64,10 @@ class ScenarioSimulator:
 
                 total_carrying_units += stock
 
-                # Check if reorder trigger is hit
+                # Check reorder trigger
                 pending_units = sum(qty for _, qty in pipeline_orders)
                 if (stock + pending_units) <= reorder_point:
-                    # Place order with simulated lead time variability
-                    actual_lead_time = max(1, int(np.random.normal(effective_lead_time, 1.5)))
+                    actual_lead_time = max(1, int(np.random.normal(effective_lead_time, 1.2)))
                     pipeline_orders.append((day + actual_lead_time, order_qty))
 
             carrying_cost = total_carrying_units * daily_holding_cost_per_unit
@@ -79,14 +80,32 @@ class ScenarioSimulator:
             trial_stockout_costs.append(stockout_cost)
             trial_total_costs.append(total_cost)
 
-        stockout_probability = float(np.mean(trial_stockouts))
-        avg_stockout_units = float(np.mean(trial_stockout_units))
-        avg_carrying_cost = float(np.mean(trial_carrying_costs))
-        avg_stockout_cost = float(np.mean(trial_stockout_costs))
-        avg_total_cost = float(np.mean(trial_total_costs))
-        p95_total_cost = float(np.percentile(trial_total_costs, 95))
+        costs_arr = np.array(trial_total_costs)
+
+        # Percentile calculations
+        min_cost = float(np.min(costs_arr))
+        max_cost = float(np.max(costs_arr))
+        avg_cost = float(np.mean(costs_arr))
+        p10_cost = float(np.percentile(costs_arr, 10))
+        p50_cost = float(np.percentile(costs_arr, 50))
+        p90_cost = float(np.percentile(costs_arr, 90))
+        p95_cost = float(np.percentile(costs_arr, 95))
+
+        # Build Histogram Bins (10 frequency bins for frontend plotting)
+        counts, bin_edges = np.histogram(costs_arr, bins=10)
+        bin_centers = [(bin_edges[i] + bin_edges[i+1]) / 2.0 for i in range(len(counts))]
+        histogram_bins = [
+            {
+                "bin_start": round(float(bin_edges[i]), 2),
+                "bin_end": round(float(bin_edges[i+1]), 2),
+                "bin_center": round(float(bin_centers[i]), 2),
+                "count": int(counts[i])
+            }
+            for i in range(len(counts))
+        ]
 
         return {
+            "scenario_name": scenario_name,
             "simulation_days": simulation_days,
             "num_trials": num_trials,
             "parameters": {
@@ -98,12 +117,20 @@ class ScenarioSimulator:
                 "demand_surge_pct": demand_surge_pct,
                 "lead_time_delay_days": lead_time_delay_days
             },
-            "results": {
-                "stockout_probability": round(stockout_probability, 4),
-                "avg_stockout_units": round(avg_stockout_units, 1),
-                "avg_carrying_cost": round(avg_carrying_cost, 2),
-                "avg_stockout_cost": round(avg_stockout_cost, 2),
-                "avg_total_cost": round(avg_total_cost, 2),
-                "p95_worst_case_total_cost": round(p95_total_cost, 2)
-            }
+            "summary_metrics": {
+                "stockout_probability": round(float(np.mean(trial_stockouts)), 4),
+                "avg_stockout_units": round(float(np.mean(trial_stockout_units)), 1),
+                "avg_carrying_cost": round(float(np.mean(trial_carrying_costs)), 2),
+                "avg_stockout_cost": round(float(np.mean(trial_stockout_costs)), 2),
+                "min_cost": round(min_cost, 2),
+                "max_cost": round(max_cost, 2),
+                "average_cost": round(avg_cost, 2),
+                "percentiles": {
+                    "p10": round(p10_cost, 2),
+                    "p50": round(p50_cost, 2), # Median cost
+                    "p90": round(p90_cost, 2),
+                    "p95": round(p95_cost, 2)  # Worst case 95%
+                }
+            },
+            "histogram": histogram_bins
         }
