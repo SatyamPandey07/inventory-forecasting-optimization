@@ -1,145 +1,160 @@
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+import pickle
 import logging
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Tuple, Optional
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("forecaster")
+logger = logging.getLogger("prophet_forecaster")
 
-class DemandForecaster:
+class ProphetDemandEngine:
     """
-    Time-Series Demand Forecaster using Prophet with Statistical Fallback.
-    Handles seasonality, holiday adjustments, confidence intervals, and MAPE calculations.
+    Core Prophet Time-Series Forecasting Engine.
+    Handles annual/weekly seasonality, US holiday effects, 90-day predictions,
+    confidence intervals (lower_bound, point_estimate, upper_bound), and MAPE/MAE metrics.
     """
 
-    def __init__(self, use_prophet: bool = True):
-        self.use_prophet = use_prophet
-
-    def forecast(
-        self, 
-        history_data: List[Dict[str, Any]], 
-        horizon_days: int = 30,
-        seasonality_mode: str = 'multiplicative'
-    ) -> Dict[str, Any]:
+    def train(
+        self,
+        history_data: List[Dict[str, Any]],
+        country_holidays: str = "US"
+    ) -> Tuple[bytes, Dict[str, Any]]:
         """
-        Input format: [{'ds': '2026-04-01', 'y': 35}, ...]
-        Returns predictions dataframe dict with lower/upper confidence bounds.
+        Trains Prophet model on historical demand data.
+        Input format: [{'ds': '2023-01-01', 'y': 42}, ...]
+        Returns (serialized_model_bytes, training_summary)
         """
-        if not history_data or len(history_data) < 7:
-            raise ValueError("At least 7 days of historical demand data required for forecasting.")
+        if not history_data or len(history_data) < 14:
+            raise ValueError("Minimum 14 days of historical demand data required to train Prophet model.")
 
         df = pd.DataFrame(history_data)
         df['ds'] = pd.to_datetime(df['ds'])
         df['y'] = pd.to_numeric(df['y'], errors='coerce').fillna(0)
         df = df.sort_values('ds').reset_index(drop=True)
 
-        prophet_success = False
-        forecast_df = None
+        try:
+            from prophet import Prophet
+            m = Prophet(
+                yearly_seasonality=len(df) >= 180,
+                weekly_seasonality=len(df) >= 14,
+                daily_seasonality=False,
+                seasonality_mode='multiplicative',
+                interval_width=0.95
+            )
+            if country_holidays:
+                try:
+                    m.add_country_holidays(country_name=country_holidays)
+                except Exception:
+                    pass
 
-        if self.use_prophet:
-            try:
-                from prophet import Prophet
-                m = Prophet(
-                    yearly_seasonality=len(df) >= 365,
-                    weekly_seasonality=len(df) >= 14,
-                    daily_seasonality=False,
-                    seasonality_mode=seasonality_mode,
-                    interval_width=0.95
-                )
-                m.fit(df)
-                future = m.make_future_dataframe(periods=horizon_days)
-                forecast = m.predict(future)
-                
-                # Filter only future predictions
-                future_forecast = forecast.tail(horizon_days)
-                
-                forecast_df = pd.DataFrame({
-                    'ds': future_forecast['ds'].dt.strftime('%Y-%m-%d'),
-                    'yhat': np.clip(np.round(future_forecast['yhat']), 0, None),
-                    'yhat_lower': np.clip(np.round(future_forecast['yhat_lower']), 0, None),
-                    'yhat_upper': np.clip(np.round(future_forecast['yhat_upper']), 0, None),
-                    'trend': np.round(future_forecast['trend'], 2)
-                })
-                prophet_success = True
-                logger.info(f"Successfully generated {horizon_days}-day Prophet forecast.")
-            except Exception as e:
-                logger.warning(f"Prophet fitting failed: {e}. Falling back to Holt-Winters / Moving Average.")
+            m.fit(df)
+            model_bytes = pickle.dumps(m)
 
-        # Fallback model if Prophet fails or is disabled
-        if not prophet_success:
-            forecast_df = self._statistical_fallback(df, horizon_days)
+            return model_bytes, {
+                "status": "success",
+                "training_samples": len(df),
+                "start_date": df['ds'].min().strftime('%Y-%m-%d'),
+                "end_date": df['ds'].max().strftime('%Y-%m-%d'),
+                "model_type": "Facebook Prophet"
+            }
+        except Exception as e:
+            logger.warning(f"Prophet training failed: {e}. Falling back to statistical model.")
+            fallback_bytes = pickle.dumps({"type": "fallback", "history": df.to_dict(orient='records')})
+            return fallback_bytes, {
+                "status": "fallback",
+                "training_samples": len(df),
+                "model_type": "Exponential Smoothing Fallback"
+            }
 
-        # Calculate in-sample accuracy (MAPE & RMSE)
-        accuracy_metrics = self._calculate_accuracy(df)
+    def predict(
+        self,
+        model_bytes: bytes,
+        horizon_days: int = 90
+    ) -> List[Dict[str, Any]]:
+        """
+        Generates demand predictions for next N days with confidence intervals.
+        Returns list of dicts: [{'ds': '2026-04-01', 'point_estimate': 45, 'lower_bound': 38, 'upper_bound': 52}]
+        """
+        model_obj = pickle.loads(model_bytes)
 
-        predictions_list = forecast_df.to_dict(orient='records')
-        total_predicted_units = int(forecast_df['yhat'].sum())
-        avg_daily_predicted = float(np.round(forecast_df['yhat'].mean(), 2))
+        if isinstance(model_obj, dict) and model_obj.get("type") == "fallback":
+            return self._predict_fallback(model_obj["history"], horizon_days)
 
-        return {
-            "model_used": "Prophet" if prophet_success else "Holt-Winters / Moving Average",
-            "horizon_days": horizon_days,
-            "total_predicted_units": total_predicted_units,
-            "avg_daily_predicted": avg_daily_predicted,
-            "accuracy": accuracy_metrics,
-            "predictions": predictions_list
-        }
+        from prophet import Prophet
+        m: Prophet = model_obj
+        future = m.make_future_dataframe(periods=horizon_days)
+        forecast = m.predict(future)
 
-    def _statistical_fallback(self, df: pd.DataFrame, horizon_days: int) -> pd.DataFrame:
-        """Holt-Winters / Exponential Smoothing / Moving Average Fallback"""
-        y_values = df['y'].values
-        last_date = df['ds'].iloc[-1]
+        future_predictions = forecast.tail(horizon_days)
+        results = []
+
+        for _, row in future_predictions.iterrows():
+            point_est = max(0, int(round(row['yhat'])))
+            lower_bnd = max(0, int(round(row['yhat_lower'])))
+            upper_bnd = max(point_est, int(round(row['yhat_upper'])))
+
+            results.append({
+                "ds": row['ds'].strftime('%Y-%m-%d'),
+                "point_estimate": point_est,
+                "lower_bound": lower_bnd,
+                "upper_bound": upper_bnd
+            })
+
+        return results
+
+    def calculate_accuracy(
+        self,
+        actuals: List[float],
+        predictions: List[float]
+    ) -> Dict[str, float]:
+        """
+        Calculates MAPE (Mean Absolute Percentage Error) and MAE (Mean Absolute Error).
+        """
+        if not actuals or not predictions or len(actuals) != len(predictions):
+            return {"mape": 0.0, "mae": 0.0}
+
+        y_true = np.array(actuals, dtype=float)
+        y_pred = np.array(predictions, dtype=float)
+
+        mae = float(np.mean(np.abs(y_true - y_pred)))
         
-        # 7-day moving average and standard deviation
-        recent_window = y_values[-14:] if len(y_values) >= 14 else y_values
-        mean_demand = np.mean(recent_window)
-        std_demand = np.std(recent_window) if len(recent_window) > 1 else mean_demand * 0.15
-
-        # Compute simple trend multiplier
-        if len(y_values) >= 14:
-            first_half = np.mean(y_values[-14:-7])
-            second_half = np.mean(y_values[-7:])
-            trend_factor = (second_half - first_half) / max(first_half, 1.0)
-            trend_factor = np.clip(trend_factor, -0.05, 0.05)
+        # Avoid division by zero in MAPE
+        non_zero_mask = y_true > 0
+        if np.any(non_zero_mask):
+            mape = float(np.mean(np.abs((y_true[non_zero_mask] - y_pred[non_zero_mask]) / y_true[non_zero_mask])))
         else:
-            trend_factor = 0.0
-
-        future_dates = [last_date + timedelta(days=i+1) for i in range(horizon_days)]
-        yhat_vals = []
-        yhat_lower = []
-        yhat_upper = []
-
-        for i in range(horizon_days):
-            predicted = mean_demand * (1.0 + (trend_factor * (i + 1)))
-            predicted = max(0, predicted)
-            yhat_vals.append(round(predicted))
-            yhat_lower.append(round(max(0, predicted - (1.96 * std_demand))))
-            yhat_upper.append(round(predicted + (1.96 * std_demand)))
-
-        return pd.DataFrame({
-            'ds': [d.strftime('%Y-%m-%d') for d in future_dates],
-            'yhat': yhat_vals,
-            'yhat_lower': yhat_lower,
-            'yhat_upper': yhat_upper,
-            'trend': np.round(mean_demand * np.ones(horizon_days), 2)
-        })
-
-    def _calculate_accuracy(self, df: pd.DataFrame) -> Dict[str, float]:
-        """Calculates MAPE and RMSE over past demand history"""
-        if len(df) < 14:
-            return {"mape": 0.05, "rmse": 2.5}
-        
-        actuals = df['y'].values[-14:]
-        forecasts = np.roll(actuals, 1) # simple baseline comparison
-        forecasts[0] = actuals[0]
-
-        errors = np.abs(actuals - forecasts)
-        non_zero_mask = actuals > 0
-        mape = float(np.mean(errors[non_zero_mask] / actuals[non_zero_mask])) if any(non_zero_mask) else 0.05
-        rmse = float(np.sqrt(np.mean((actuals - forecasts) ** 2)))
+            mape = 0.0
 
         return {
             "mape": round(mape, 4),
-            "rmse": round(rmse, 2)
+            "mae": round(mae, 2)
         }
+
+    def _predict_fallback(
+        self,
+        history: List[Dict[str, Any]],
+        horizon_days: int
+    ) -> List[Dict[str, Any]]:
+        df = pd.DataFrame(history)
+        y_vals = df['y'].values
+        last_date = pd.to_datetime(df['ds'].iloc[-1])
+
+        recent = y_vals[-14:] if len(y_vals) >= 14 else y_vals
+        mean_val = float(np.mean(recent))
+        std_val = float(np.std(recent)) if len(recent) > 1 else mean_val * 0.15
+
+        results = []
+        for i in range(1, horizon_days + 1):
+            next_date = last_date + timedelta(days=i)
+            point_est = max(0, int(round(mean_val)))
+            lower_bnd = max(0, int(round(mean_val - (1.96 * std_val))))
+            upper_bnd = int(round(mean_val + (1.96 * std_val)))
+
+            results.append({
+                "ds": next_date.strftime('%Y-%m-%d'),
+                "point_estimate": point_est,
+                "lower_bound": lower_bnd,
+                "upper_bound": upper_bnd
+            })
+        return results
