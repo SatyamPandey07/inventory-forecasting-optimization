@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'InventoryAI Dashboards'
+    orgId: 1
+    folder: 'InventoryAI Operational Dashboards'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

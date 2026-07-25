@@ -1,0 +1,38 @@
+groups:
+  - name: inventoryai_alerts
+    rules:
+      - alert: ForecastAccuracyLow
+        expr: forecast_accuracy < 0.70
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Forecast accuracy MAPE dropped below 70%"
+          description: "Prophet model MAPE accuracy for SKU {{ $labels.sku_id }} is under 70%."
+
+      - alert: StockoutDetected
+        expr: inventory_stockouts > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Inventory Stockout Event Detected"
+          description: "Active inventory stockout detected for tenant {{ $labels.org_id }}."
+
+      - alert: ForecastJobFailed
+        expr: forecast_job_duration_seconds_count == 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Scheduled Forecast Job Failure"
+          description: "Automated Prophet retraining job failed to execute."
+
+      - alert: HighApiLatency
+        expr: histogram_quantile(0.95, rate(api_latency_seconds_bucket[5m])) > 1.0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API Latency (> 1s)"
+          description: "p95 API latency exceeded 1.0 second threshold."

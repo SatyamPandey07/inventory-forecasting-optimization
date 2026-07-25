@@ -1,0 +1,19 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "id": null,
+  "title": "4. Supplier Performance Dashboard",
+  "tags": ["inventoryai", "suppliers"],
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Lead Time Variance & On-Time Delivery Rate",
+      "type": "stat",
+      "targets": [{ "expr": "recommendation_acceptance_rate", "legendFormat": "Supplier Score" }],
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 }
+    }
+  ],
+  "schemaVersion": 38,
+  "version": 1
+}

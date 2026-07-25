@@ -13,6 +13,8 @@ services:
     volumes:
       - timescale_data:/var/lib/postgresql/data
       - ./db-migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+      - ./db-migrations/002_external_signals.sql:/docker-entrypoint-initdb.d/002_external_signals.sql
+      - ./db-migrations/003_llm_recommendations.sql:/docker-entrypoint-initdb.d/003_llm_recommendations.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U inventory_user -d inventoryai"]
       interval: 5s
@@ -30,6 +32,15 @@ services:
       timeout: 5s
       retries: 5
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: inventoryai-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml
+
   grafana:
     image: grafana/grafana:latest
     container_name: inventoryai-grafana
@@ -38,8 +49,13 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - postgres
+      - prometheus
 
   python-forecasting:
     build:

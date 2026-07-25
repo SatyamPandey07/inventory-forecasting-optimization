@@ -1,0 +1,26 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "id": null,
+  "title": "2. Inventory Health Dashboard",
+  "tags": ["inventoryai", "inventory"],
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active Stockouts (Inventory < ROP)",
+      "type": "stat",
+      "targets": [{ "expr": "inventory_stockouts", "legendFormat": "Stockout Count" }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "title": "Inventory Turns & Overstock Monitoring",
+      "type": "timeseries",
+      "targets": [{ "expr": "recommendation_acceptance_rate", "legendFormat": "Turns Ratio" }],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+    }
+  ],
+  "schemaVersion": 38,
+  "version": 1
+}

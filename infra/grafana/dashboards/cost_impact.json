@@ -1,0 +1,19 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "id": null,
+  "title": "3. Cost Impact Dashboard",
+  "tags": ["inventoryai", "costs"],
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Carrying & Stockout Cost Trends",
+      "type": "timeseries",
+      "targets": [{ "expr": "recommendation_acceptance_rate * 1000", "legendFormat": "Cost Impact ($)" }],
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 }
+    }
+  ],
+  "schemaVersion": 38,
+  "version": 1
+}
