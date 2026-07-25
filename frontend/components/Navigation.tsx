@@ -2,7 +2,8 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+
 import { 
   TrendingUp, 
   Sparkles, 
@@ -21,6 +22,7 @@ import { useAuth } from '../lib/AuthContext';
 
 export default function Navigation() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, logout } = useAuth();
 
   const navItems = [
@@ -41,7 +43,7 @@ export default function Navigation() {
           <Box className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="font-bold text-lg text-white tracking-tight">InventoryAI</h1>
+          <Link href="/" className="font-bold text-lg text-white tracking-tight">InventoryAI</Link>
           <p className="text-xs text-slate-400 font-medium">Supply Chain SaaS</p>
         </div>
       </div>
@@ -78,7 +80,7 @@ export default function Navigation() {
                 <p className="font-semibold text-xs text-slate-200 truncate">{user.org_name}</p>
               </div>
               <button
-                onClick={logout}
+                onClick={() => { logout(); router.push('/login'); }}
                 title="Sign Out"
                 className="text-slate-400 hover:text-rose-400 transition-colors p-1"
               >

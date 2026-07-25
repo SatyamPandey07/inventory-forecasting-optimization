@@ -7,8 +7,8 @@ import { Box, Lock, Mail, ArrowRight, ShieldCheck, Sparkles, Key } from 'lucide-
 import { useAuth } from '../../lib/AuthContext';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@acmeretail.com');
-  const [password, setPassword] = useState('••••••••••••');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const { login, loginWithSSO, demoLogin, loading, user } = useAuth();
   const router = useRouter();
 

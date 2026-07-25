@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Navigation from "../components/Navigation";
 import { AuthProvider } from "../lib/AuthContext";
+import RouteGuard from "../components/RouteGuard";
+import NavigationWrapper from "../components/NavigationWrapper";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,12 +21,15 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.className} bg-[#0A0F1D] text-slate-100 min-h-screen flex antialiased`}>
         <AuthProvider>
-          <Navigation />
-          <main className="flex-1 p-8 overflow-y-auto">
-            {children}
-          </main>
+          <RouteGuard>
+            <NavigationWrapper />
+            <main className="flex-1 p-8 overflow-y-auto">
+              {children}
+            </main>
+          </RouteGuard>
         </AuthProvider>
       </body>
     </html>
   );
 }
+

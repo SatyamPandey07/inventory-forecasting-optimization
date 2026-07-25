@@ -32,24 +32,20 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<UserProfile | null>({
-    id: 'usr-demo-001',
-    email: 'admin@acmeretail.com',
-    name: 'Alex Rivera',
-    org_name: 'Acme Retail Corp',
-    role: 'Supply Chain Director'
-  });
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true); // true until localStorage is read
 
   useEffect(() => {
-    // Check local storage session
-    const savedUser = localStorage.getItem('inventoryai_user');
-    if (savedUser) {
-      try {
+    // Restore session from localStorage on mount
+    try {
+      const savedUser = localStorage.getItem('inventoryai_user');
+      if (savedUser) {
         setUser(JSON.parse(savedUser));
-      } catch (e) {
-        console.error('Failed to parse saved user session:', e);
       }
+    } catch (e) {
+      console.error('Failed to parse saved user session:', e);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -63,7 +59,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const newUser: UserProfile = {
         id: `usr-${Date.now()}`,
         email: email,
-        name: email.split('@')[0].replace('.', ' '),
+        name: 'Satyam Pandey',
         org_name: 'Acme Retail Corp',
         role: 'Operations Director'
       };
@@ -123,8 +119,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const demoLogin = () => {
     const demoUser: UserProfile = {
       id: 'usr-demo-001',
-      email: 'admin@acmeretail.com',
-      name: 'Alex Rivera',
+      email: 'satyam@acmeretail.com',
+      name: 'Satyam Pandey',
       org_name: 'Acme Retail Corp',
       role: 'Supply Chain Director'
     };
