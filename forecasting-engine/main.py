@@ -13,8 +13,8 @@ from llm_reasoner import LLMReasoningEngine
 from weather_events import ExternalDataEnricher
 
 app = FastAPI(
-    title="InventoryAI — Forecasting & External Signals Engine",
-    description="Python FastAPI service for Prophet demand forecasting, OpenWeatherMap signals, Calendar events, Competitor price tracking, and AI reasoning.",
+    title="InventoryAI — Forecasting & LLM Reasoning Engine",
+    description="Python FastAPI service for Prophet forecasting, Claude API reasoning, weather signals, and inventory optimization.",
     version="1.0.0"
 )
 
@@ -39,64 +39,42 @@ except Exception:
     redis_client = None
 
 # --- Schemas ---
-class CompetitorPriceEntry(BaseModel):
-    sku_id: str = Field(..., example="33333333-3333-3333-3333-333333333333")
-    competitor_name: str = Field(..., example="Amazon Retail")
-    price: float = Field(..., example=74.99)
-    source: Optional[str] = "manual_entry"
-
-# In-memory store fallback for competitor prices
-COMPETITOR_PRICES_DB = []
+class LLMReasonRequest(BaseModel):
+    sku_name: str = Field(..., example="Wireless Ergonomic Keyboard")
+    category: str = Field(..., example="Electronics")
+    current_stock: int = Field(..., example=38)
+    reorder_point: int = Field(..., example=48)
+    forecast_30day_units: int = Field(..., example=120)
+    weather_signal: Optional[Dict[str, Any]] = None
+    calendar_events: Optional[List[Dict[str, Any]]] = None
+    competitor_status: Optional[Dict[str, Any]] = None
 
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "Python FastAPI Engine"}
 
-# --- External Signals Endpoints ---
-@app.get("/signals/weather")
-async def get_weather_signal(city: str = Query("New York")):
+@app.post("/recommendations/reason")
+async def generate_recommendation_reasoning(req: LLMReasonRequest):
     """
-    GET /signals/weather
-    Fetches current weather and 5-day forecast from OpenWeatherMap.
+    POST /recommendations/reason
+    Calls Anthropic Claude API (or 1-hour Redis cache / fallback engine) to synthesize
+    demand forecasts, weather, events, and competitor signals into structured reorder reasoning.
     """
-    weather_data = await weather_enricher.get_weather_forecast(city)
-    return weather_data
-
-@app.get("/signals/events")
-def get_calendar_events(year: int = Query(2026), country: str = Query("US")):
-    """
-    GET /signals/events
-    Returns upcoming public holidays and commercial retail events (Black Friday, Christmas, etc.).
-    """
-    events = weather_enricher.get_upcoming_events(year, country)
-    return {
-        "year": year,
-        "country": country,
-        "total_events": len(events),
-        "events": events
-    }
-
-@app.get("/signals/competitor")
-def get_competitor_prices(sku_id: Optional[str] = None):
-    """
-    GET /signals/competitor
-    Returns recorded competitor pricing for SKUs.
-    """
-    if sku_id:
-        filtered = [c for c in COMPETITOR_PRICES_DB if c.get("sku_id") == sku_id]
-        return {"sku_id": sku_id, "prices": filtered}
-    return {"total_records": len(COMPETITOR_PRICES_DB), "prices": COMPETITOR_PRICES_DB}
-
-@app.post("/signals/competitor")
-def record_competitor_price(entry: CompetitorPriceEntry):
-    """
-    POST /signals/competitor
-    Records competitor pricing per SKU (supports manual entry or web unlocker ingestion).
-    """
-    record = entry.model_dump()
-    record["recorded_at"] = "2026-07-25T17:28:00Z"
-    COMPETITOR_PRICES_DB.append(record)
-    return {"status": "success", "recorded": record}
+    try:
+        result = await llm_engine.generate_reasoning(
+            sku_name=req.sku_name,
+            category=req.category,
+            current_stock=req.current_stock,
+            reorder_point=req.reorder_point,
+            forecast_30day_units=req.forecast_30day_units,
+            weather_signal=req.weather_signal,
+            calendar_events=req.calendar_events,
+            competitor_status=req.competitor_status,
+            redis_client=redis_client
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
