@@ -1,5 +1,6 @@
 import os
 from celery import Celery
+from celery.schedules import crontab
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -15,17 +16,25 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    beat_schedule={
+        "weekly-monday-model-retraining": {
+            "task": "retrain_all_prophet_models",
+            "schedule": crontab(minute=0, hour=0, day_of_week="monday"),
+        },
+    }
 )
 
-@celery_app.task(name="run_nightly_demand_forecast")
-def run_nightly_demand_forecast(org_id: str):
-    """Nightly Celery Task: Generates 30-day Prophet demand forecasts for all active SKUs."""
-    logger.info(f"Starting nightly Prophet forecast generation for Org {org_id}...")
-    # Simulated batch forecast execution
-    return {"status": "success", "org_id": org_id, "processed_skus": 3, "horizon_days": 30}
-
-@celery_app.task(name="retrain_forecasting_models")
-def retrain_forecasting_models(org_id: str):
-    """Weekly Celery Task: Retrains time-series models and updates forecast accuracy metrics."""
-    logger.info(f"Retraining Prophet & ARIMA models for Org {org_id}...")
-    return {"status": "success", "org_id": org_id, "mape_avg": 0.048}
+@celery_app.task(name="retrain_all_prophet_models")
+def retrain_all_prophet_models():
+    """
+    Weekly Automated Retraining Task:
+    Triggers Prophet model retraining every Monday at 00:00 UTC across all active SKUs.
+    """
+    logger.info("Executing Monday midnight 00:00 UTC automated Prophet model retraining...")
+    # Simulated automated retraining logic
+    return {
+        "status": "success",
+        "retrained_count": 10,
+        "average_mape": 0.048,
+        "timestamp": "Monday 00:00 UTC"
+    }
