@@ -1,4 +1,4 @@
-# 📦 InventoryAI — Demand Forecasting & Inventory Optimization SaaS
+# InventoryAI — Demand Forecasting & Inventory Optimization SaaS
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-green.svg)](https://www.python.org/)
@@ -6,13 +6,13 @@
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
 [![Version](https://img.shields.io/badge/Version-v1.0.0-indigo.svg)](https://github.com/SatyamPandey07/inventory-forecasting-optimization/releases/tag/v1.0.0)
 
-## ℹ️ About InventoryAI
+## About InventoryAI
 
 InventoryAI is a full-stack, enterprise-ready supply chain SaaS platform engineered to eliminate stockouts and optimize inventory holding costs. Built with a Next.js 14 frontend, Node.js Express gateway, Python FastAPI machine learning engine, PostgreSQL + TimescaleDB database, and Redis caching stack, it delivers end-to-end demand intelligence. The platform combines Facebook Prophet forecasting, SciPy economic order quantity (EOQ) optimization, Anthropic Claude generative AI executive reasoning, and 1,000-trial Monte Carlo risk simulations into a production-ready cloud application.
 
 ---
 
-## 🎯 Executive Overview & Functional Capabilities
+## Executive Overview & Functional Capabilities
 
 Managing retail inventory requires balancing two conflicting financial pressures:
 - **Stockout Risk**: Ordering too little inventory leads to stockouts, unfulfilled customer demand, and lost sales revenue.
@@ -28,7 +28,7 @@ Managing retail inventory requires balancing two conflicting financial pressures
 
 ---
 
-## 🔐 Full-Stack Authentication & SSO Integration
+## Full-Stack Authentication & SSO Integration
 
 InventoryAI includes an enterprise authentication and access management layer built with **Supabase Auth**:
 - **Email & Password Authentication**: Organization sign-up (`/signup`) and tenant sign-in (`/login`) with encrypted session management.
@@ -38,24 +38,7 @@ InventoryAI includes an enterprise authentication and access management layer bu
 
 ---
 
-## 🌐 1-Click Vercel & Netlify Deployment
-
-The Next.js frontend (`frontend/`) is pre-configured for instant 1-click cloud deployment:
-
-### Deploy to Vercel
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FSatyamPandey07%2Finventory-forecasting-optimization&root-directory=frontend)
-
-```bash
-cd frontend
-npx vercel
-```
-
-### Deploy to Netlify
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/SatyamPandey07/inventory-forecasting-optimization)
-
----
-
-## 📸 Interface & Product Visual Tour
+## Interface & Product Visual Tour
 
 ### 1. Executive Control Tower Dashboard (`/`)
 Real-time monitoring dashboard displaying active monitered SKUs, 30-day aggregate sales volume, revenue metrics, stockout risk alerts, top monitored stock levels, 5-minute auto-polling status, and CSV data export.
@@ -85,7 +68,7 @@ Comprehensive accuracy tracking displaying Prophet model Mean Absolute Percentag
 
 ---
 
-## 🔀 Incremental Development Pull Request (PR) History
+## Incremental Development Pull Request (PR) History
 
 This monorepo was developed iteratively following Conventional Commits across 9 feature branches:
 
@@ -101,7 +84,7 @@ This monorepo was developed iteratively following Conventional Commits across 9 
 
 ---
 
-## 🏗️ Monorepo Architecture & Microservices
+## Monorepo Architecture & Microservices
 
 ```text
 inventory-forecasting-optimization/
@@ -126,7 +109,7 @@ inventory-forecasting-optimization/
 
 ---
 
-## 🚀 Quick Start & Deployment Guide
+## Quick Start & Deployment Guide
 
 ### Prerequisites
 - Docker Engine 20.10+ & Docker Compose v2+
@@ -151,7 +134,7 @@ docker compose -f infra/docker-compose.yml ps
 
 ---
 
-## 📚 Technical Documentation
+## Technical Documentation
 
 - 🏛️ [System Architecture & Multi-Tenant Specs](docs/ARCHITECTURE.md)
 - 🎯 [Product Guide & Functional Capabilities](docs/PRODUCT.md)
