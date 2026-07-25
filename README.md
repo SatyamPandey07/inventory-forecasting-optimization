@@ -9,7 +9,7 @@
 ```text
 inventory-forecasting-optimization/
   ├── backend-api/              # Node.js Express Gateway (Multi-tenant API, Auth, SKUs)
-  ├── forecasting-engine/       # Python FastAPI Engine (Prophet, Signals, LLM, Optimization)
+  ├── forecasting-engine/       # Python FastAPI Engine (Prophet, Signals, LLM, Simulator)
   ├── frontend/                 # Next.js 14 + React + TypeScript Dashboard UI
   ├── infra/
   │   ├── docker-compose.yml    # Multi-service local orchestration
@@ -20,19 +20,26 @@ inventory-forecasting-optimization/
 
 ---
 
+## 🎲 Scenario Planning & Cost Simulator
+
+InventoryAI provides a discrete-event Monte Carlo simulator (`POST /scenarios/simulate`) executing 1,000 trial runs over a 90-day horizon to evaluate supply chain disruption risks and total cost distributions.
+
+### Supported Scenario Queries
+- **Weather Scenario:** *"What if it rains next Saturday?"* (`demand_surge_pct: +15.0`)
+- **Competitor Scenario:** *"What if competitor goes out of stock?"* (`demand_surge_pct: +20.0`)
+- **Supplier Scenario:** *"What if our supplier delays 1 week?"* (`lead_time_delay_days: +7`)
+- **Demand Spike Scenario:** *"What if demand spikes 50%?"* (`demand_surge_pct: +50.0`)
+
+### Statistical Output Structure
+- **Percentiles**: 10th (`p10`), 50th (`p50` median), 90th (`p90`), and 95th (`p95` worst-case risk).
+- **Histogram Visualization Payload**: 10 frequency bins (`bin_edges`, `counts`, `bin_centers`) formatted for histogram charts (Recharts / Chart.js).
+
+---
+
 ## 📊 Optimization Algorithm Engine
 
-InventoryAI implements a multi-objective inventory optimization algorithm (`POST /optimize/inventory`) that balances holding costs vs stockout penalties under supply chain constraints:
-
-### Cost Minimization Objective
-$$\text{Total Monthly Cost}(Q) = \text{Carrying Cost}(Q) + \text{Ordering Cost}(Q) + \text{Expected Stockout Risk Cost}(Q)$$
-- Uses `scipy.optimize.minimize_scalar` to calculate the optimal order quantity ($Q^*$).
-- Safety stock calculation incorporates supplier lead time reliability weighting:
-  $$\text{Effective Lead Time} = \text{Lead Time Days} \times \left(1 + (1 - \text{Reliability Score})\right)$$
-
-### Supplier Constraint Enforcement
-1. **Minimum Order Quantity (`min_order_qty`)**: If calculated $Q^* < \text{min\_order\_qty}$, automatically rounds up to satisfy supplier minimums or flags alternative suppliers.
-2. **Lead Time Urgency Rules**: If supplier lead time $\ge 14$ days and current stock $\le \text{ROP}$, triggers an immediate `URGENT_IMMEDIATE` reorder recommendation.
+- **Cost Minimization**: Minimizes Total Monthly Cost = Carrying Cost + Stockout Penalty.
+- **Supplier Constraints**: Automatically rounds to supplier `min_order_qty` minimums and flags `URGENT_IMMEDIATE` reorder alerts when supplier lead time $\ge 14$ days.
 
 ---
 
@@ -46,7 +53,7 @@ $$\text{Total Monthly Cost}(Q) = \text{Carrying Cost}(Q) + \text{Ordering Cost}(
 ## ⚙️ Open-Source Tech Stack
 
 - **Backend Gateway:** Node.js + TypeScript (Express)
-- **Forecasting & ML Engine:** Python 3.11 + FastAPI + Facebook Prophet + SciPy
+- **Forecasting & ML Engine:** Python 3.11 + FastAPI + Facebook Prophet + SciPy + NumPy
 - **Database:** PostgreSQL 15 + TimescaleDB Extension (Time-series hypertables)
 - **Cache & Async Queue:** Redis + Celery
 - **Dashboard Frontend:** Next.js 14 + React + Tailwind CSS + Recharts
@@ -77,7 +84,7 @@ docker compose -f infra/docker-compose.yml up --build
 - [x] **PR #3 — External Signals (Weather, Calendar Events, Competitor Tracking)**
 - [x] **PR #4 — Claude LLM Executive Reasoning Layer**
 - [x] **PR #5 — Multi-Objective Inventory Optimization Engine**
-- [ ] **PR #6 — Monte Carlo Supply Disruption Scenario Simulator**
+- [x] **PR #6 — Monte Carlo Supply Disruption Scenario Simulator**
 - [ ] **PR #7 — Node.js Express Gateway Multi-Tenant API Routes**
 - [ ] **PR #8 — Next.js Executive Control Tower & Interactive Dashboard**
 - [ ] **PR #9 — Grafana Observability & Final System Polish**
