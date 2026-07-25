@@ -9,7 +9,7 @@
 ```text
 inventory-forecasting-optimization/
   ├── backend-api/              # Node.js Express Gateway (Multi-tenant API, Auth, SKUs)
-  ├── forecasting-engine/       # Python FastAPI Engine (Prophet, EOQ Math, LLM Reasoning)
+  ├── forecasting-engine/       # Python FastAPI Engine (Prophet, Signals, LLM Reasoning)
   ├── frontend/                 # Next.js 14 + React + TypeScript Dashboard UI
   ├── infra/
   │   ├── docker-compose.yml    # Multi-service local orchestration
@@ -20,16 +20,23 @@ inventory-forecasting-optimization/
 
 ---
 
-## 📈 Forecasting Engine
+## ⛅ External Signals Engine
 
-The core forecasting engine is powered by **Facebook Prophet** hosted inside the `/forecasting-engine` Python FastAPI microservice.
+InventoryAI integrates external exogenous factors to refine demand forecasts:
 
-### Key Capabilities
-- **Model Training (`POST /forecast/train`)**: Trains Prophet models using historical daily demand (`ds`, `y`). Automatically detects annual seasonality (holiday surges, back-to-school spikes), weekly weekend seasonality, and US country holidays. Serializes trained model binaries into Redis (`model:{org_id}:{sku_id}`).
-- **90-Day Demand Prediction (`GET /forecast/predict`)**: Generates 90-day demand predictions returning point estimates along with 95% confidence bounds (`lower_bound`, `point_estimate`, `upper_bound`).
-- **Accuracy Evaluation (`GET /forecast/accuracy`)**: Evaluates model precision against historical actuals by calculating **MAPE** (Mean Absolute Percentage Error) and **MAE** (Mean Absolute Error).
-- **Automated Celery Retraining**: Celery beat schedule automatically triggers batch retraining every **Monday at 00:00 UTC** (`crontab(minute=0, hour=0, day_of_week='monday')`).
-- **Sample Retail Data Loader (`scripts/seed_retail_data.py`)**: Generates 3 years (1,095 days) of daily demand history for 10 retail SKUs across multiple categories for performance testing.
+### 1. OpenWeatherMap Weather Integration (`GET /signals/weather`)
+- Synchronizes temperature, humidity, and precipitation data into the TimescaleDB `weather_data` hypertable.
+- **Configuration:** Add your free API key in `.env`:
+  ```env
+  OPENWEATHER_API_KEY=your_openweather_api_key_here
+  ```
+
+### 2. Calendar & Holiday Signals (`GET /signals/events`)
+- Automatically detects national holidays (US/Global) and commercial shopping dates (Black Friday, Cyber Monday, Back-to-School, Christmas) stored in `calendar_events`.
+
+### 3. Competitor Price Tracking (`GET & POST /signals/competitor`)
+- Endpoint for recording competitor prices per SKU (`competitor_prices`).
+- Architectural documentation for enterprise scraping using **Bright Data** Web Unlocker & SERP API is available in [`docs/competitor_tracking.md`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/docs/competitor_tracking.md).
 
 ---
 
@@ -46,13 +53,6 @@ The core forecasting engine is powered by **Facebook Prophet** hosted inside the
 
 ## 🚀 Quick Start (Local Setup)
 
-### Prerequisites
-- Docker & Docker Compose
-- Node.js 20+
-- Python 3.11+
-
-### Running the Full Stack
-
 ```bash
 # Clone the repository
 git clone https://github.com/SatyamPandey07/inventory-forecasting-optimization.git
@@ -65,22 +65,16 @@ cp .env.example .env
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-### Microservice Endpoints
-- **Next.js Dashboard:** `http://localhost:3000`
-- **Node.js Express Gateway:** `http://localhost:4000/health`
-- **Python FastAPI Engine Docs:** `http://localhost:8000/docs`
-- **Grafana Monitoring:** `http://localhost:3001` (User: `admin` / Password: `admin`)
-
 ---
 
 ## 🗺️ 9-PR Implementation Roadmap
 
 - [x] **PR #1 — Monorepo Scaffolding & Initial Schema Models**
 - [x] **PR #2 — Core Prophet Demand Forecasting Engine**
-- [ ] **PR #3 — Safety Stock, ROP, and EOQ Inventory Optimization Engine**
-- [ ] **PR #4 — Monte Carlo Supply Disruption Scenario Simulator**
-- [ ] **PR #5 — LLM Executive Reasoning & Plain-English Explanations**
-- [ ] **PR #6 — Node.js Express Gateway Multi-Tenant API Routes**
-- [ ] **PR #7 — Next.js Executive Control Tower & Interactive Dashboard**
-- [ ] **PR #8 — Celery Background Jobs & Automated Retraining**
-- [ ] **PR #9 — Grafana Observability, CI/CD Pipelines, & Final System Polish**
+- [x] **PR #3 — External Signals (Weather, Calendar Events, Competitor Tracking)**
+- [ ] **PR #4 — Safety Stock, ROP, and EOQ Inventory Optimization Engine**
+- [ ] **PR #5 — Monte Carlo Supply Disruption Scenario Simulator**
+- [ ] **PR #6 — LLM Executive Reasoning & Plain-English Explanations**
+- [ ] **PR #7 — Node.js Express Gateway Multi-Tenant API Routes**
+- [ ] **PR #8 — Next.js Executive Control Tower & Interactive Dashboard**
+- [ ] **PR #9 — Grafana Observability & Final System Polish**
