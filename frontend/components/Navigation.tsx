@@ -11,11 +11,17 @@ import {
   BarChart3,
   Settings,
   LineChart,
-  Box
+  Box,
+  LogIn,
+  LogOut,
+  User,
+  Building
 } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
 
 export default function Navigation() {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
 
   const navItems = [
     { href: '/', label: 'Overview', icon: BarChart3 },
@@ -41,7 +47,7 @@ export default function Navigation() {
       </div>
 
       {/* Nav Menu */}
-      <nav className="flex-1 p-4 space-y-1.5">
+      <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
@@ -62,15 +68,39 @@ export default function Navigation() {
         })}
       </nav>
 
-      {/* Tenant Indicator */}
-      <div className="p-4 border-t border-[#1F2937]">
-        <div className="bg-[#1F2937]/50 p-3 rounded-xl flex items-center space-x-3">
-          <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
-          <div className="text-xs">
-            <p className="font-semibold text-slate-200">Acme Retail Corp</p>
-            <p className="text-slate-400">Pro Plan • Auto-polling 5m</p>
+      {/* Tenant Indicator & Auth Controls */}
+      <div className="p-4 border-t border-[#1F2937] space-y-3">
+        {user ? (
+          <div className="bg-[#1F2937]/50 p-3 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                <p className="font-semibold text-xs text-slate-200 truncate">{user.org_name}</p>
+              </div>
+              <button
+                onClick={logout}
+                title="Sign Out"
+                className="text-slate-400 hover:text-rose-400 transition-colors p-1"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="text-[11px] text-slate-400 border-t border-[#374151]/50 pt-1.5 flex items-center justify-between">
+              <span className="truncate">{user.name}</span>
+              <span className="text-indigo-400 font-semibold">{user.role}</span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-2">
+            <Link
+              href="/login"
+              className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center justify-center space-x-2 transition-colors"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In / Auth</span>
+            </Link>
+          </div>
+        )}
       </div>
     </aside>
   );

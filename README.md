@@ -6,11 +6,13 @@
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
 [![Version](https://img.shields.io/badge/Version-v1.0.0-indigo.svg)](https://github.com/SatyamPandey07/inventory-forecasting-optimization/releases/tag/v1.0.0)
 
-**InventoryAI** (DemandFlow) is an enterprise-grade, open-source supply chain intelligence SaaS platform. It combines time-series demand forecasting, multi-objective economic order quantity (EOQ) cost optimization, generative AI executive reasoning, and Monte Carlo risk simulations to eliminate costly stockout lost sales and minimize warehouse holding capital.
+## ℹ️ About InventoryAI
+
+InventoryAI is an enterprise-grade demand forecasting and inventory optimization platform designed for retail supply chain operations. It combines Facebook Prophet machine learning, SciPy multi-objective cost optimization, and Claude LLM executive reasoning to predict demand, calculate optimal reorder points, and eliminate costly stockouts.
 
 ---
 
-## 🎯 Executive Overview & Product Functionality
+## 🎯 Executive Overview & Functional Capabilities
 
 Managing retail inventory requires balancing two conflicting financial pressures:
 - **Stockout Risk**: Ordering too little inventory leads to stockouts, unfulfilled customer demand, and lost sales revenue.
@@ -23,6 +25,33 @@ Managing retail inventory requires balancing two conflicting financial pressures
 3. **Generative AI Executive Reasoning Layer**: Integrates Anthropic Claude (`claude-3-5-sonnet`) to synthesize multi-signal inputs (forecast trends, OpenWeatherMap weather patterns, public holiday calendars, competitor stockouts) into actionable, plain-language executive prose recommendations.
 4. **What-If Monte Carlo Scenario Simulator**: Performs discrete-event simulations across 1,000 trial runs over a 90-day horizon, calculating risk percentiles ($p_{10}, p_{50}, p_{90}, p_{95}$) and outcome cost distributions under supply chain disruptions, lead time delays, and demand shocks.
 5. **Operational Observability & Analytics**: Exposes Prometheus metrics across microservices, provisions 5 operational Grafana dashboards, tracks forecast accuracy trends (MAPE / MAE), and logs user recommendation acceptance outcomes for verifiable financial ROI auditing.
+
+---
+
+## 🔐 Full-Stack Authentication & SSO Integration
+
+InventoryAI includes an enterprise authentication and access management layer built with **Supabase Auth**:
+- **Email & Password Authentication**: Organization sign-up (`/signup`) and tenant sign-in (`/login`) with encrypted session management.
+- **Single Sign-On (SSO) & OAuth2**: Native support for Google OAuth, GitHub OAuth, and SAML 2.0 enterprise SSO.
+- **Demo Quick Access**: 1-click Demo Admin login mode allowing instant evaluation without requiring live database credentials.
+- **Multi-Tenant Data Isolation**: Every API endpoint and database query scopes data strictly to the authenticated tenant organization (`org_id`).
+
+---
+
+## 🌐 1-Click Vercel & Netlify Deployment
+
+The Next.js frontend (`frontend/`) is pre-configured for instant 1-click cloud deployment:
+
+### Deploy to Vercel
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FSatyamPandey07%2Finventory-forecasting-optimization&root-directory=frontend)
+
+```bash
+cd frontend
+npx vercel
+```
+
+### Deploy to Netlify
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/SatyamPandey07/inventory-forecasting-optimization)
 
 ---
 
@@ -56,13 +85,29 @@ Comprehensive accuracy tracking displaying Prophet model Mean Absolute Percentag
 
 ---
 
+## 🔀 Incremental Development Pull Request (PR) History
+
+This monorepo was developed iteratively following Conventional Commits across 9 feature branches:
+
+1. [PR #1 — Monorepo Scaffolding & Initial Schema Models](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/monorepo-setup)
+2. [PR #2 — Core Prophet Demand Forecasting Engine & 90-Day Predictions](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/prophet-forecasting)
+3. [PR #3 — External Signals Integration (Weather, Calendar Events, Competitor Tracking)](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/external-signals)
+4. [PR #4 — Anthropic Claude LLM Executive Reasoning Layer](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/llm-reasoning)
+5. [PR #5 — Multi-Objective Inventory Optimization Engine (SciPy EOQ)](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/inventory-optimization)
+6. [PR #6 — Monte Carlo Supply Disruption Scenario Simulator](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/scenario-planning)
+7. [PR #7 — Next.js 14 Executive Control Tower & React Dashboard UI](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/frontend-dashboards)
+8. [PR #8 — Grafana Operational Dashboards & Prometheus Monitoring](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/grafana-dashboards)
+9. [PR #9 — Continuous Learning, Production Hardening & v1.0.0 Tag](https://github.com/SatyamPandey07/inventory-forecasting-optimization/pull/new/feat/continuous-learning)
+
+---
+
 ## 🏗️ Monorepo Architecture & Microservices
 
 ```text
 inventory-forecasting-optimization/
   ├── backend-api/              # Node.js Express Gateway (Multi-tenant API, Auth, Metrics)
   ├── forecasting-engine/       # Python FastAPI Engine (Prophet, Signals, LLM, Simulator)
-  ├── frontend/                 # Next.js 14 + React + TypeScript Dashboard UI
+  ├── frontend/                 # Next.js 14 + React + TypeScript Dashboard UI (Vercel/Netlify)
   ├── infra/
   │   ├── docker-compose.yml    # Multi-service local orchestration
   │   ├── db-migrations/        # PostgreSQL + TimescaleDB schema SQL scripts
@@ -87,7 +132,7 @@ inventory-forecasting-optimization/
 - Docker Engine 20.10+ & Docker Compose v2+
 - Node.js 20+ & Python 3.11 (for local non-containerized development)
 
-### Deployment Steps
+### Local Docker Compose Deployment
 
 ```bash
 # 1. Clone the repository
