@@ -8,60 +8,61 @@
 
 ```text
 inventory-forecasting-optimization/
-  ├── backend-api/              # Node.js Express Gateway (Multi-tenant API, Auth, SKUs)
-  ├── forecasting-engine/       # Python FastAPI Engine (Prophet, Signals, LLM, Simulator)
+  ├── backend-api/              # Node.js Express Gateway (Multi-tenant API, Auth, Metrics)
+  ├── forecasting-engine/       # Python FastAPI Engine (Prophet, Signals, LLM, Prometheus)
   ├── frontend/                 # Next.js 14 + React + TypeScript Dashboard UI
   ├── infra/
   │   ├── docker-compose.yml    # Multi-service local orchestration
-  │   └── db-migrations/        # PostgreSQL + TimescaleDB schema SQL scripts
+  │   ├── db-migrations/        # PostgreSQL + TimescaleDB schema SQL scripts
+  │   ├── prometheus/           # Prometheus scraping config & AlertManager rules
+  │   └── grafana/              # Provisioned operational Grafana dashboards & datasources
   ├── docs/                     # System Architecture & Design docs
   └── README.md
 ```
 
 ---
 
+## 📉 Observability & Operational Dashboards
+
+InventoryAI provides an open-source monitoring stack featuring **Prometheus** metrics collection, **AlertManager** alert rules, and 5 auto-provisioned **Grafana** operational dashboards:
+
+### 1. Provisioned Grafana Dashboards (`http://localhost:3001`)
+1. **Forecast Accuracy Dashboard**: Tracks MAPE %, MAE, and precision trends over time per SKU.
+2. **Inventory Health Dashboard**: Monitors active stockout events (`inventory < ROP`), overstock warnings (`inventory > 2x ROP`), and turnover ratios.
+3. **Cost Impact Dashboard**: Visualizes monthly carrying cost trends, stockout risk penalties, and AI reorder savings.
+4. **Supplier Performance Dashboard**: Evaluates lead time variance, on-time delivery percentages, and quality ratings.
+5. **System Health & Performance Dashboard**: Monitors API latency percentiles (p50, p95, p99), forecast job duration, and HTTP status codes.
+
+### 2. Prometheus Metrics (`/metrics`)
+- `forecast_accuracy`: Gauge tracking Prophet forecast accuracy (MAPE) per SKU.
+- `inventory_stockouts`: Counter tracking detected stockout events.
+- `recommendation_acceptance_rate`: Gauge tracking accepted AI recommendation ratio.
+- `api_latency_seconds`: Histogram tracking HTTP request durations.
+- `forecast_job_duration_seconds`: Histogram tracking batch retraining execution times.
+
+### 3. AlertManager Rules (`infra/prometheus/alerts.yml`)
+- `ForecastAccuracyLow`: Fires if forecast accuracy drops below 70% MAPE.
+- `StockoutDetected`: Fires on stockout events.
+- `ForecastJobFailed`: Fires if batch retraining job fails.
+- `HighApiLatency`: Fires if p95 API latency exceeds 1.0s.
+
+---
+
 ## 💻 Next.js React Dashboard UI
 
-InventoryAI features a responsive dashboard built with **Next.js 14**, **React**, **Tailwind CSS**, and **Recharts**:
-
-1. **Executive Control Tower ([`app/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/page.tsx))**: Real-time inventory levels, demand trends, top SKUs table, auto-polling every 5 minutes, and CSV export.
-2. **AI Reorders & Decisions ([`app/recommendations/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/recommendations/page.tsx))**: Pending reorder recommendations, expected cost savings, Claude LLM prose reasoning, Accept/Reject buttons, and CSV export.
-3. **What-If Scenario Simulator ([`app/simulator/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/simulator/page.tsx))**: Sliders for lead time delay and demand variance, executing 1,000 Monte Carlo trials and plotting cost outcome distributions as a histogram bar chart.
-4. **Supplier Performance Scorecard ([`app/suppliers/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/suppliers/page.tsx))**: Supplier lead times, reliability ratings, and quality scores.
-5. **Settings & SKU Manager ([`app/settings/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/settings/page.tsx))**: Organization details, add new SKU form, carrying cost % and stockout penalty constraints.
-6. **Analytics & Precision Tracking ([`app/analytics/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/analytics/page.tsx))**: Forecast precision metrics (MAPE/MAE trends over time) and decision cost savings audit.
-
----
-
-## 🎲 Scenario Planning & Cost Simulator
-
-- **Percentile Metrics**: 10th (`p10`), 50th (`p50` median), 90th (`p90`), and 95th (`p95` worst-case risk).
-- **Histogram Visualization Payload**: 10 frequency bins (`bin_edges`, `counts`, `bin_centers`) formatted for histogram charts.
-
----
-
-## 📊 Optimization Algorithm Engine
-
-- **Cost Minimization**: Minimizes Total Monthly Cost = Carrying Cost + Stockout Penalty.
-- **Supplier Constraints**: Automatically rounds to supplier `min_order_qty` minimums and flags `URGENT_IMMEDIATE` reorder alerts when supplier lead time $\ge 14$ days.
-
----
-
-## 🤖 LLM Integration & Reasoning Layer
-
-- **Multi-Signal Synthesis (`POST /recommendations/reason`)**: Combines 30-day Prophet forecast demand, OpenWeatherMap signals, holiday events, competitor stockouts, and current stock.
-- **1-Hour Redis Caching (`llm_cache:{hash}`)**: Hashes request payloads to cache responses for 1 hour (3,600s).
+- **Executive Control Tower ([`app/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/page.tsx))**: Real-time inventory levels, demand trends, top SKUs table, auto-polling every 5 minutes, and CSV export.
+- **AI Reorders & Decisions ([`app/recommendations/page.tsx`](file:///Users/satyampandey/.gemini/antigravity-ide/scratch/inventory-forecasting-optimization/frontend/app/recommendations/page.tsx))**: Pending reorders, Claude LLM reasoning, Accept/Reject buttons, and CSV export.
 
 ---
 
 ## ⚙️ Open-Source Tech Stack
 
-- **Backend Gateway:** Node.js + TypeScript (Express)
-- **Forecasting & ML Engine:** Python 3.11 + FastAPI + Facebook Prophet + SciPy + NumPy
+- **Backend Gateway:** Node.js + TypeScript (Express) + `prom-client`
+- **Forecasting & ML Engine:** Python 3.11 + FastAPI + Facebook Prophet + `prometheus-client`
 - **Database:** PostgreSQL 15 + TimescaleDB Extension (Time-series hypertables)
 - **Cache & Async Queue:** Redis + Celery
 - **Dashboard Frontend:** Next.js 14 + React + Tailwind CSS + Recharts
-- **Observability:** Grafana + Prometheus
+- **Observability:** Grafana + Prometheus + AlertManager
 
 ---
 
@@ -90,5 +91,5 @@ docker compose -f infra/docker-compose.yml up --build
 - [x] **PR #5 — Multi-Objective Inventory Optimization Engine**
 - [x] **PR #6 — Monte Carlo Supply Disruption Scenario Simulator**
 - [x] **PR #7 — Next.js Executive Control Tower & Interactive Dashboard**
-- [ ] **PR #8 — Celery Background Jobs & Automated Retraining**
-- [ ] **PR #9 — Grafana Observability & Final System Polish**
+- [x] **PR #8 — Grafana Operational Dashboards & Prometheus Monitoring**
+- [ ] **PR #9 — Final Integration, End-to-End System Polish, & Release**
