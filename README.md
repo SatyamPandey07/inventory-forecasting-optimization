@@ -1,4 +1,4 @@
-# InventoryAI — Demand Forecasting & Inventory Optimization SaaS
+# InventoryAI - Demand Forecasting & Inventory Optimization SaaS
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-green.svg)](https://www.python.org/)
