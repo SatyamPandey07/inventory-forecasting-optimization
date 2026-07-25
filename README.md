@@ -44,13 +44,13 @@ Managing retail inventory requires balancing two conflicting financial pressures
 
 ## Architecture Diagram
 
-![Architecture Diagram](file:///Users/satyampandey/.gemini/antigravity-ide/brain/f7745fec-4fbb-4bf7-9dcb-3a829c51869f/architecture_diagram_1784988851076.png)
+![Architecture Diagram](docs/images/architecture_diagram.png)
 
 ---
 
 ## Entity Relationship Diagram
 
-![ER Diagram](file:///Users/satyampandey/.gemini/antigravity-ide/brain/f7745fec-4fbb-4bf7-9dcb-3a829c51869f/er_diagram_1784988864708.png)
+![ER Diagram](docs/images/er_diagram.png)
 
 ---
 
