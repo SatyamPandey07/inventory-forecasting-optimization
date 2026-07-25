@@ -1,84 +1,127 @@
 import math
 import numpy as np
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from scipy.optimize import minimize_scalar
 
 class InventoryOptimizer:
     """
-    Inventory Optimization Engine:
-    Calculates Safety Stock (SS), Reorder Point (ROP), Economic Order Quantity (EOQ),
-    and Total Cost of Inventory for targeted service levels.
+    Multi-Objective Inventory Optimization Engine:
+    Finds the optimal Economic Order Quantity (EOQ) and safety stock buffer
+    minimizing Total Cost = Carrying Cost + Ordering Cost + Expected Stockout Cost,
+    while accounting for supplier lead time reliability, forecast confidence,
+    and supplier min_order_qty constraints.
     """
 
     SERVICE_LEVEL_Z = {
         0.90: 1.28,
         0.95: 1.645,
         0.98: 2.05,
-        0.99: 2.33,
-        0.999: 3.09
+        0.99: 2.33
     }
 
-    def optimize_sku(
+    def optimize_inventory_multi_objective(
         self,
-        avg_daily_demand: float,
-        std_daily_demand: float,
-        lead_time_days: int,
-        std_lead_time_days: float = 1.0,
-        unit_cost: float = 50.0,
-        holding_cost_annual_pct: float = 0.20, # 20% annual holding cost
-        order_cost: float = 100.0,            # $100 per reorder
-        stockout_penalty_per_unit: float = 25.0,
+        unit_cost: float,
+        reorder_point: int,
+        current_stock: int,
+        predicted_daily_demand: float,
+        demand_std_dev: float,
+        forecast_horizon_days: int = 30,
+        supplier_lead_time_days: int = 7,
+        supplier_reliability_score: float = 0.95,
+        supplier_min_order_qty: int = 1,
+        carrying_cost_per_unit_month: float = 2.50,
+        stockout_penalty_per_unit: float = 30.0,
         service_level: float = 0.95
     ) -> Dict[str, Any]:
         """
-        Calculates optimal inventory metrics for a given SKU and target service level.
+        Multi-objective optimization returning optimal reorder quantity and cost breakdown.
         """
+        # 1. Supplier Reliability & Effective Lead Time Adjustment
+        # Less reliable suppliers effectively extend expected lead time variability
+        effective_lead_time = supplier_lead_time_days * (1.0 + (1.0 - supplier_reliability_score))
+        
+        # 2. Safety Stock & Reorder Point Calculation
         Z = self.SERVICE_LEVEL_Z.get(service_level, 1.645)
+        var_demand = max(1.0, demand_std_dev ** 2)
+        var_lead_time = (supplier_lead_time_days * (1.0 - supplier_reliability_score)) ** 2
         
-        # 1. Safety Stock Calculation (considering both demand & lead time variance)
-        # SS = Z * sqrt( (L * sigma_D^2) + (D^2 * sigma_L^2) )
-        var_demand = std_daily_demand ** 2
-        var_lead_time = std_lead_time_days ** 2
-        
-        safety_stock = Z * math.sqrt(
-            (lead_time_days * var_demand) + ((avg_daily_demand ** 2) * var_lead_time)
-        )
-        safety_stock = int(math.ceil(safety_stock))
+        safety_stock = int(math.ceil(Z * math.sqrt(
+            (effective_lead_time * var_demand) + ((predicted_daily_demand ** 2) * var_lead_time)
+        )))
 
-        # 2. Reorder Point (ROP) = (Average Daily Demand * Lead Time) + Safety Stock
-        reorder_point = int(math.ceil((avg_daily_demand * lead_time_days) + safety_stock))
+        calculated_rop = int(math.ceil((predicted_daily_demand * effective_lead_time) + safety_stock))
 
-        # 3. Annual Demand (D_annual) = avg_daily_demand * 365
-        annual_demand = avg_daily_demand * 365
-        holding_cost_per_unit_annual = unit_cost * holding_cost_annual_pct
+        # 3. Multi-Objective Cost Objective Function
+        # Total Cost(Q) = Annual Holding Cost + Annual Order Setup Cost + Expected Stockout Cost
+        annual_demand = predicted_daily_demand * 365.0
+        annual_carrying_cost_per_unit = carrying_cost_per_unit_month * 12.0
+        order_setup_cost = 100.0
 
-        # 4. Economic Order Quantity (EOQ) = sqrt((2 * D_annual * OrderCost) / HoldingCostPerUnit)
-        if holding_cost_per_unit_annual > 0:
-            eoq = math.sqrt((2 * annual_demand * order_cost) / holding_cost_per_unit_annual)
-            eoq = int(math.ceil(eoq))
-        else:
-            eoq = int(math.ceil(avg_daily_demand * 30))
+        def cost_objective(Q):
+            if Q <= 0:
+                return 1e9
+            annual_holding = ((Q / 2.0) + safety_stock) * annual_carrying_cost_per_unit
+            annual_ordering = (annual_demand / Q) * order_setup_cost
+            stockout_prob = 1.0 - service_level
+            annual_stockout_cost = annual_demand * stockout_prob * stockout_penalty_per_unit
+            return annual_holding + annual_ordering + annual_stockout_cost
 
-        # 5. Annual Cost Analysis
-        annual_ordering_cost = (annual_demand / max(eoq, 1)) * order_cost
-        annual_holding_cost = ((eoq / 2.0) + safety_stock) * holding_cost_per_unit_annual
-        
-        # Estimated stockout probability & risk cost
+        # Numerical Optimization
+        res = minimize_scalar(cost_objective, bounds=(10, max(500, int(annual_demand * 0.5))), method='bounded')
+        raw_optimal_q = int(math.ceil(res.x)) if res.success else int(math.ceil(math.sqrt((2 * annual_demand * order_setup_cost) / annual_carrying_cost_per_unit)))
+
+        # 4. Supplier Constraint Evaluation (min_order_qty & lead time urgency)
+        recommended_q = raw_optimal_q
+        constraint_notes = []
+
+        if supplier_min_order_qty > 1 and raw_optimal_q < supplier_min_order_qty:
+            recommended_q = supplier_min_order_qty
+            constraint_notes.append(
+                f"Calculated optimal quantity ({raw_optimal_q} units) was below supplier minimum order quantity "
+                f"({supplier_min_order_qty} units). Adjusted order quantity to {supplier_min_order_qty} units. "
+                f"Consider evaluating alternative suppliers if holding cost is prohibitive."
+            )
+
+        # Lead Time Urgency Check
+        reorder_urgency = "STANDARD"
+        if supplier_lead_time_days >= 14 and current_stock <= calculated_rop:
+            reorder_urgency = "URGENT_IMMEDIATE"
+            constraint_notes.append(
+                f"Supplier lead time is extended ({supplier_lead_time_days} days). "
+                f"Current stock ({current_stock} units) is below calculated ROP ({calculated_rop} units). Reorder immediately today."
+            )
+        elif current_stock <= calculated_rop:
+            reorder_urgency = "RECOMMENDED"
+
+        # 5. Cost Breakdown
+        monthly_carrying_cost = round(((recommended_q / 2.0) + safety_stock) * carrying_cost_per_unit_month, 2)
         stockout_prob = 1.0 - service_level
-        annual_stockout_risk_cost = annual_demand * stockout_prob * stockout_penalty_per_unit
-        total_annual_inventory_cost = annual_ordering_cost + annual_holding_cost + annual_stockout_risk_cost
+        expected_monthly_stockout_cost = round((predicted_daily_demand * 30.0) * stockout_prob * stockout_penalty_per_unit, 2)
+        total_monthly_cost = round(monthly_carrying_cost + expected_monthly_stockout_cost, 2)
+
+        # Confidence Interval based on demand variance
+        ci_margin = int(math.ceil(1.96 * demand_std_dev * math.sqrt(forecast_horizon_days)))
+        total_forecast_horizon_demand = int(round(predicted_daily_demand * forecast_horizon_days))
 
         return {
-            "service_level": service_level,
-            "z_score": Z,
+            "recommended_order_quantity": recommended_q,
+            "raw_calculated_eoq": raw_optimal_q,
             "safety_stock": safety_stock,
-            "reorder_point": reorder_point,
-            "economic_order_quantity": eoq,
-            "avg_daily_demand": round(avg_daily_demand, 2),
-            "annual_demand_projected": int(round(annual_demand)),
-            "cost_breakdown": {
-                "annual_ordering_cost": round(annual_ordering_cost, 2),
-                "annual_holding_cost": round(annual_holding_cost, 2),
-                "annual_stockout_risk_cost": round(annual_stockout_risk_cost, 2),
-                "total_annual_cost": round(total_annual_inventory_cost, 2)
+            "reorder_point": calculated_rop,
+            "reorder_urgency": reorder_urgency,
+            "expected_carrying_cost_monthly": monthly_carrying_cost,
+            "expected_stockout_cost_monthly": expected_monthly_stockout_cost,
+            "total_monthly_cost": total_monthly_cost,
+            "confidence_interval_horizon_demand": {
+                "lower_bound": max(0, total_forecast_horizon_demand - ci_margin),
+                "point_estimate": total_forecast_horizon_demand,
+                "upper_bound": total_forecast_horizon_demand + ci_margin
+            },
+            "supplier_constraints": {
+                "min_order_qty": supplier_min_order_qty,
+                "effective_lead_time_days": round(effective_lead_time, 1),
+                "reliability_score": supplier_reliability_score,
+                "constraint_notes": " ".join(constraint_notes) if constraint_notes else "Optimal order satisfies all supplier constraints."
             }
         }
