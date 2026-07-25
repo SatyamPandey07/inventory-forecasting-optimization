@@ -13,8 +13,8 @@ from llm_reasoner import LLMReasoningEngine
 from weather_events import ExternalDataEnricher
 
 app = FastAPI(
-    title="InventoryAI — Forecasting & LLM Reasoning Engine",
-    description="Python FastAPI service for Prophet forecasting, Claude API reasoning, weather signals, and inventory optimization.",
+    title="InventoryAI — Forecasting & Optimization Engine",
+    description="Python FastAPI service for Prophet forecasting, multi-objective inventory optimization, Claude LLM reasoning, and weather signals.",
     version="1.0.0"
 )
 
@@ -39,38 +39,45 @@ except Exception:
     redis_client = None
 
 # --- Schemas ---
-class LLMReasonRequest(BaseModel):
-    sku_name: str = Field(..., example="Wireless Ergonomic Keyboard")
-    category: str = Field(..., example="Electronics")
-    current_stock: int = Field(..., example=38)
+class MultiObjectiveOptimizeRequest(BaseModel):
+    unit_cost: float = Field(..., example=35.0)
     reorder_point: int = Field(..., example=48)
-    forecast_30day_units: int = Field(..., example=120)
-    weather_signal: Optional[Dict[str, Any]] = None
-    calendar_events: Optional[List[Dict[str, Any]]] = None
-    competitor_status: Optional[Dict[str, Any]] = None
+    current_stock: int = Field(..., example=38)
+    predicted_daily_demand: float = Field(..., example=35.0)
+    demand_std_dev: float = Field(..., example=8.5)
+    forecast_horizon_days: Optional[int] = 30
+    supplier_lead_time_days: Optional[int] = 7
+    supplier_reliability_score: Optional[float] = 0.95
+    supplier_min_order_qty: Optional[int] = 1
+    carrying_cost_per_unit_month: Optional[float] = 2.50
+    stockout_penalty_per_unit: Optional[float] = 30.0
+    service_level: Optional[float] = 0.95
 
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "Python FastAPI Engine"}
 
-@app.post("/recommendations/reason")
-async def generate_recommendation_reasoning(req: LLMReasonRequest):
+@app.post("/optimize/inventory")
+def optimize_inventory_multi_objective(req: MultiObjectiveOptimizeRequest):
     """
-    POST /recommendations/reason
-    Calls Anthropic Claude API (or 1-hour Redis cache / fallback engine) to synthesize
-    demand forecasts, weather, events, and competitor signals into structured reorder reasoning.
+    POST /optimize/inventory
+    Multi-objective numerical optimization minimizing total costs (carrying cost + stockout cost)
+    considering supplier lead time reliability, forecast confidence, and min_order_qty constraints.
     """
     try:
-        result = await llm_engine.generate_reasoning(
-            sku_name=req.sku_name,
-            category=req.category,
-            current_stock=req.current_stock,
+        result = optimizer.optimize_inventory_multi_objective(
+            unit_cost=req.unit_cost,
             reorder_point=req.reorder_point,
-            forecast_30day_units=req.forecast_30day_units,
-            weather_signal=req.weather_signal,
-            calendar_events=req.calendar_events,
-            competitor_status=req.competitor_status,
-            redis_client=redis_client
+            current_stock=req.current_stock,
+            predicted_daily_demand=req.predicted_daily_demand,
+            demand_std_dev=req.demand_std_dev,
+            forecast_horizon_days=req.forecast_horizon_days or 30,
+            supplier_lead_time_days=req.supplier_lead_time_days or 7,
+            supplier_reliability_score=req.supplier_reliability_score or 0.95,
+            supplier_min_order_qty=req.supplier_min_order_qty or 1,
+            carrying_cost_per_unit_month=req.carrying_cost_per_unit_month or 2.50,
+            stockout_penalty_per_unit=req.stockout_penalty_per_unit or 30.0,
+            service_level=req.service_level or 0.95
         )
         return result
     except Exception as e:
