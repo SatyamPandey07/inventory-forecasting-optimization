@@ -7,16 +7,29 @@
 ## 🏗️ Monorepo Structure
 
 ```text
-/inventory-forecasting-optimization
-  ├── /backend-api              # Node.js Express Gateway (Multi-tenant API, Auth, SKUs)
-  ├── /forecasting-engine       # Python FastAPI Engine (Prophet, EOQ Math, LLM Reasoning)
-  ├── /frontend                 # Next.js 14 + React + TypeScript Dashboard UI
-  ├── /infra
-  │   ├── /docker-compose.yml   # Multi-service local orchestration
-  │   └── /db-migrations        # PostgreSQL + TimescaleDB schema SQL scripts
-  ├── /docs                     # System Architecture & Design docs
+inventory-forecasting-optimization/
+  ├── backend-api/              # Node.js Express Gateway (Multi-tenant API, Auth, SKUs)
+  ├── forecasting-engine/       # Python FastAPI Engine (Prophet, EOQ Math, LLM Reasoning)
+  ├── frontend/                 # Next.js 14 + React + TypeScript Dashboard UI
+  ├── infra/
+  │   ├── docker-compose.yml    # Multi-service local orchestration
+  │   └── db-migrations/        # PostgreSQL + TimescaleDB schema SQL scripts
+  ├── docs/                     # System Architecture & Design docs
   └── README.md
 ```
+
+---
+
+## 📈 Forecasting Engine
+
+The core forecasting engine is powered by **Facebook Prophet** hosted inside the `/forecasting-engine` Python FastAPI microservice.
+
+### Key Capabilities
+- **Model Training (`POST /forecast/train`)**: Trains Prophet models using historical daily demand (`ds`, `y`). Automatically detects annual seasonality (holiday surges, back-to-school spikes), weekly weekend seasonality, and US country holidays. Serializes trained model binaries into Redis (`model:{org_id}:{sku_id}`).
+- **90-Day Demand Prediction (`GET /forecast/predict`)**: Generates 90-day demand predictions returning point estimates along with 95% confidence bounds (`lower_bound`, `point_estimate`, `upper_bound`).
+- **Accuracy Evaluation (`GET /forecast/accuracy`)**: Evaluates model precision against historical actuals by calculating **MAPE** (Mean Absolute Percentage Error) and **MAE** (Mean Absolute Error).
+- **Automated Celery Retraining**: Celery beat schedule automatically triggers batch retraining every **Monday at 00:00 UTC** (`crontab(minute=0, hour=0, day_of_week='monday')`).
+- **Sample Retail Data Loader (`scripts/seed_retail_data.py`)**: Generates 3 years (1,095 days) of daily demand history for 10 retail SKUs across multiple categories for performance testing.
 
 ---
 
@@ -63,11 +76,11 @@ docker compose -f infra/docker-compose.yml up --build
 ## 🗺️ 9-PR Implementation Roadmap
 
 - [x] **PR #1 — Monorepo Scaffolding & Initial Schema Models**
-- [ ] **PR #2 — PostgreSQL + TimescaleDB Time-Series Data Pipelines**
-- [ ] **PR #3 — Python Prophet Demand Forecasting Engine**
-- [ ] **PR #4 — Safety Stock, ROP, and EOQ Inventory Optimization Engine**
-- [ ] **PR #5 — Monte Carlo Supply Disruption Scenario Simulator**
-- [ ] **PR #6 — LLM Executive Reasoning & Plain-English Explanations**
-- [ ] **PR #7 — Node.js Express Gateway Multi-Tenant API Routes**
-- [ ] **PR #8 — Next.js Executive Control Tower & Interactive Dashboard**
-- [ ] **PR #9 — Celery Background Jobs, Grafana Observability, & CI/CD**
+- [x] **PR #2 — Core Prophet Demand Forecasting Engine**
+- [ ] **PR #3 — Safety Stock, ROP, and EOQ Inventory Optimization Engine**
+- [ ] **PR #4 — Monte Carlo Supply Disruption Scenario Simulator**
+- [ ] **PR #5 — LLM Executive Reasoning & Plain-English Explanations**
+- [ ] **PR #6 — Node.js Express Gateway Multi-Tenant API Routes**
+- [ ] **PR #7 — Next.js Executive Control Tower & Interactive Dashboard**
+- [ ] **PR #8 — Celery Background Jobs & Automated Retraining**
+- [ ] **PR #9 — Grafana Observability, CI/CD Pipelines, & Final System Polish**
