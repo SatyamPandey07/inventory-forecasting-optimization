@@ -1,160 +1,114 @@
 import pandas as pd
 import numpy as np
+from prophet import Prophet
 import pickle
-import logging
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Tuple, Optional
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("prophet_forecaster")
+import json
+from typing import Dict, Any, Tuple, Optional
+import os
 
 class ProphetDemandEngine:
     """
-    Core Prophet Time-Series Forecasting Engine.
-    Handles annual/weekly seasonality, US holiday effects, 90-day predictions,
-    confidence intervals (lower_bound, point_estimate, upper_bound), and MAPE/MAE metrics.
+    Prophet Demand Forecasting Engine with Champion/Challenger Model Validation:
+    Handles Prophet model training, weekly retraining with accuracy verification,
+    90-day predictions with confidence bands, and MAPE/MAE evaluation math.
     """
 
-    def train(
-        self,
-        history_data: List[Dict[str, Any]],
-        country_holidays: str = "US"
-    ) -> Tuple[bytes, Dict[str, Any]]:
+    def train_model(self, df: pd.DataFrame, sku_id: str) -> Tuple[bytes, float, float]:
         """
-        Trains Prophet model on historical demand data.
-        Input format: [{'ds': '2023-01-01', 'y': 42}, ...]
-        Returns (serialized_model_bytes, training_summary)
+        Trains a Prophet forecasting model on historical demand data (ds, y).
+        Returns serialized model binary, MAPE %, and MAE.
         """
-        if not history_data or len(history_data) < 14:
-            raise ValueError("Minimum 14 days of historical demand data required to train Prophet model.")
+        if len(df) < 14:
+            raise ValueError(f"Insufficient historical data for SKU {sku_id}. Require at least 14 days.")
 
-        df = pd.DataFrame(history_data)
-        df['ds'] = pd.to_datetime(df['ds'])
-        df['y'] = pd.to_numeric(df['y'], errors='coerce').fillna(0)
-        df = df.sort_values('ds').reset_index(drop=True)
+        model = Prophet(
+            yearly_seasonality=True,
+            weekly_seasonality=True,
+            daily_seasonality=False,
+            interval_width=0.95
+        )
+        model.add_country_holidays(country_name='US')
+        model.fit(df)
+
+        # Calculate in-sample accuracy metrics (MAPE & MAE)
+        forecast = model.predict(df[['ds']])
+        y_true = df['y'].values
+        y_pred = forecast['yhat'].values
+
+        mape = float(np.mean(np.abs((y_true - y_pred) / np.maximum(y_true, 1.0)))) * 100.0
+        mae = float(np.mean(np.abs(y_true - y_pred)))
+
+        model_bytes = pickle.dumps(model)
+        return model_bytes, mape, mae
+
+    def train_champion_challenger(
+        self, 
+        df: pd.DataFrame, 
+        sku_id: str, 
+        existing_model_bytes: Optional[bytes] = None
+    ) -> Dict[str, Any]:
+        """
+        Champion/Challenger Model Selection:
+        Trains a new Challenger model. If an existing Champion model exists in Redis,
+        compares Challenger MAPE vs Champion MAPE. Promotes Challenger only if it achieves lower MAPE.
+        """
+        new_model_bytes, new_mape, new_mae = self.train_model(df, sku_id)
+
+        if not existing_model_bytes:
+            return {
+                "action": "PROMOTED_INITIAL",
+                "model_bytes": new_model_bytes,
+                "champion_mape": new_mape,
+                "challenger_mape": new_mape,
+                "mae": new_mae,
+                "reason": "Initial model training. Promoted to Champion."
+            }
 
         try:
-            from prophet import Prophet
-            m = Prophet(
-                yearly_seasonality=len(df) >= 180,
-                weekly_seasonality=len(df) >= 14,
-                daily_seasonality=False,
-                seasonality_mode='multiplicative',
-                interval_width=0.95
-            )
-            if country_holidays:
-                try:
-                    m.add_country_holidays(country_name=country_holidays)
-                except Exception:
-                    pass
+            old_model = pickle.loads(existing_model_bytes)
+            old_forecast = old_model.predict(df[['ds']])
+            y_true = df['y'].values
+            y_old_pred = old_forecast['yhat'].values
+            old_mape = float(np.mean(np.abs((y_true - y_old_pred) / np.maximum(y_true, 1.0)))) * 100.0
+        except Exception:
+            old_mape = 999.0
 
-            m.fit(df)
-            model_bytes = pickle.dumps(m)
-
-            return model_bytes, {
-                "status": "success",
-                "training_samples": len(df),
-                "start_date": df['ds'].min().strftime('%Y-%m-%d'),
-                "end_date": df['ds'].max().strftime('%Y-%m-%d'),
-                "model_type": "Facebook Prophet"
+        if new_mape < old_mape:
+            return {
+                "action": "PROMOTED_CHALLENGER",
+                "model_bytes": new_model_bytes,
+                "champion_mape": new_mape,
+                "previous_mape": old_mape,
+                "accuracy_improvement": round(old_mape - new_mape, 2),
+                "mae": new_mae,
+                "reason": f"Challenger model achieved lower MAPE ({round(new_mape, 2)}% vs {round(old_mape, 2)}%). Promoted to Champion."
             }
-        except Exception as e:
-            logger.warning(f"Prophet training failed: {e}. Falling back to statistical model.")
-            fallback_bytes = pickle.dumps({"type": "fallback", "history": df.to_dict(orient='records')})
-            return fallback_bytes, {
-                "status": "fallback",
-                "training_samples": len(df),
-                "model_type": "Exponential Smoothing Fallback"
-            }
-
-    def predict(
-        self,
-        model_bytes: bytes,
-        horizon_days: int = 90
-    ) -> List[Dict[str, Any]]:
-        """
-        Generates demand predictions for next N days with confidence intervals.
-        Returns list of dicts: [{'ds': '2026-04-01', 'point_estimate': 45, 'lower_bound': 38, 'upper_bound': 52}]
-        """
-        model_obj = pickle.loads(model_bytes)
-
-        if isinstance(model_obj, dict) and model_obj.get("type") == "fallback":
-            return self._predict_fallback(model_obj["history"], horizon_days)
-
-        from prophet import Prophet
-        m: Prophet = model_obj
-        future = m.make_future_dataframe(periods=horizon_days)
-        forecast = m.predict(future)
-
-        future_predictions = forecast.tail(horizon_days)
-        results = []
-
-        for _, row in future_predictions.iterrows():
-            point_est = max(0, int(round(row['yhat'])))
-            lower_bnd = max(0, int(round(row['yhat_lower'])))
-            upper_bnd = max(point_est, int(round(row['yhat_upper'])))
-
-            results.append({
-                "ds": row['ds'].strftime('%Y-%m-%d'),
-                "point_estimate": point_est,
-                "lower_bound": lower_bnd,
-                "upper_bound": upper_bnd
-            })
-
-        return results
-
-    def calculate_accuracy(
-        self,
-        actuals: List[float],
-        predictions: List[float]
-    ) -> Dict[str, float]:
-        """
-        Calculates MAPE (Mean Absolute Percentage Error) and MAE (Mean Absolute Error).
-        """
-        if not actuals or not predictions or len(actuals) != len(predictions):
-            return {"mape": 0.0, "mae": 0.0}
-
-        y_true = np.array(actuals, dtype=float)
-        y_pred = np.array(predictions, dtype=float)
-
-        mae = float(np.mean(np.abs(y_true - y_pred)))
-        
-        # Avoid division by zero in MAPE
-        non_zero_mask = y_true > 0
-        if np.any(non_zero_mask):
-            mape = float(np.mean(np.abs((y_true[non_zero_mask] - y_pred[non_zero_mask]) / y_true[non_zero_mask])))
         else:
-            mape = 0.0
+            return {
+                "action": "RETAINED_CHAMPION",
+                "model_bytes": existing_model_bytes,
+                "champion_mape": old_mape,
+                "challenger_mape": new_mape,
+                "mae": new_mae,
+                "reason": f"Existing Champion model retained ({round(old_mape, 2)}% MAPE vs Challenger {round(new_mape, 2)}% MAPE)."
+            }
 
-        return {
-            "mape": round(mape, 4),
-            "mae": round(mae, 2)
-        }
+    def predict_demand(self, model_bytes: bytes, horizon_days: int = 90) -> List[Dict[str, Any]]:
+        """
+        Generates N-day forward demand prediction with 95% confidence intervals.
+        """
+        model = pickle.loads(model_bytes)
+        future = model.make_future_dataframe(periods=horizon_days)
+        forecast = model.predict(future)
 
-    def _predict_fallback(
-        self,
-        history: List[Dict[str, Any]],
-        horizon_days: int
-    ) -> List[Dict[str, Any]]:
-        df = pd.DataFrame(history)
-        y_vals = df['y'].values
-        last_date = pd.to_datetime(df['ds'].iloc[-1])
-
-        recent = y_vals[-14:] if len(y_vals) >= 14 else y_vals
-        mean_val = float(np.mean(recent))
-        std_val = float(np.std(recent)) if len(recent) > 1 else mean_val * 0.15
-
-        results = []
-        for i in range(1, horizon_days + 1):
-            next_date = last_date + timedelta(days=i)
-            point_est = max(0, int(round(mean_val)))
-            lower_bnd = max(0, int(round(mean_val - (1.96 * std_val))))
-            upper_bnd = int(round(mean_val + (1.96 * std_val)))
-
-            results.append({
-                "ds": next_date.strftime('%Y-%m-%d'),
-                "point_estimate": point_est,
-                "lower_bound": lower_bnd,
-                "upper_bound": upper_bnd
+        predictions = []
+        future_rows = forecast.tail(horizon_days)
+        for _, row in future_rows.iterrows():
+            predictions.append({
+                "date": row['ds'].strftime('%Y-%m-%d'),
+                "point_estimate": max(0, int(round(row['yhat']))),
+                "lower_bound": max(0, int(round(row['yhat_lower']))),
+                "upper_bound": max(0, int(round(row['yhat_upper'])))
             })
-        return results
+
+        return predictions
