@@ -8,7 +8,7 @@
 
 ## ℹ️ About InventoryAI
 
-InventoryAI is an enterprise-grade demand forecasting and inventory optimization platform designed for retail supply chain operations. It combines Facebook Prophet machine learning, SciPy multi-objective cost optimization, and Claude LLM executive reasoning to predict demand, calculate optimal reorder points, and eliminate costly stockouts.
+InventoryAI is a full-stack, enterprise-ready supply chain SaaS platform engineered to eliminate stockouts and optimize inventory holding costs. Built with a Next.js 14 frontend, Node.js Express gateway, Python FastAPI machine learning engine, PostgreSQL + TimescaleDB database, and Redis caching stack, it delivers end-to-end demand intelligence. The platform combines Facebook Prophet forecasting, SciPy economic order quantity (EOQ) optimization, Anthropic Claude generative AI executive reasoning, and 1,000-trial Monte Carlo risk simulations into a production-ready cloud application.
 
 ---
 
