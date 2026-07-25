@@ -7,7 +7,7 @@
 [![Version](https://img.shields.io/badge/Version-v1.0.0-indigo.svg)](https://github.com/SatyamPandey07/inventory-forecasting-optimization/releases/tag/v1.0.0)
 
 ## About InventoryAI
-<div align="right">
+<div align="left">
   <strong>Live Demo:</strong> <a href="https://fascinating-narwhal-5f1ac9.netlify.app/">https://fascinating-narwhal-5f1ac9.netlify.app/</a>
 </div>
 
