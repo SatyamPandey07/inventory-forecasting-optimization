@@ -1,7 +1,7 @@
 {
   "name": "inventoryai-backend-node",
   "version": "1.0.0",
-  "description": "Node.js Express Gateway for User Management, Multi-tenant routing, and FastAPI integration",
+  "description": "Node.js Express Gateway for User Management, Multi-tenant routing, and Prometheus metrics",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
@@ -14,7 +14,8 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.11.3"
+    "pg": "^8.11.3",
+    "prom-client": "^15.1.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
